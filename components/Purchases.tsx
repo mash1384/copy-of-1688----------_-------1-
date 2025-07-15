@@ -175,51 +175,51 @@ const Purchases: React.FC<PurchasesProps> = ({ purchases, products, onAddPurchas
       </div>
 
       {/* 통계 대시보드 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-600 text-sm font-medium">총 매입 건수</p>
-              <p className="text-2xl font-bold text-blue-800">{statistics.totalPurchases}</p>
+              <p className="text-blue-600 text-xs font-medium">총 매입 건수</p>
+              <p className="text-xl font-bold text-blue-800">{statistics.totalPurchases}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center">
-              <span className="text-blue-600 text-xl">📦</span>
+            <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center">
+              <span className="text-blue-600 text-sm">📦</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200">
+        <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-600 text-sm font-medium">총 매입 비용</p>
-              <p className="text-2xl font-bold text-green-800">₩{statistics.totalCost.toLocaleString()}</p>
+              <p className="text-green-600 text-xs font-medium">총 매입 비용</p>
+              <p className="text-xl font-bold text-green-800">₩{statistics.totalCost.toLocaleString()}</p>
             </div>
-            <div className="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center">
-              <span className="text-green-600 text-xl">💰</span>
+            <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center">
+              <span className="text-green-600 text-sm">💰</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border border-purple-200">
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-purple-600 text-sm font-medium">총 상품 수량</p>
-              <p className="text-2xl font-bold text-purple-800">{statistics.totalItems}</p>
+              <p className="text-purple-600 text-xs font-medium">총 상품 수량</p>
+              <p className="text-xl font-bold text-purple-800">{statistics.totalItems}</p>
             </div>
-            <div className="w-12 h-12 bg-purple-200 rounded-full flex items-center justify-center">
-              <span className="text-purple-600 text-xl">📊</span>
+            <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center">
+              <span className="text-purple-600 text-sm">📊</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-xl border border-orange-200">
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-orange-600 text-sm font-medium">평균 매입 비용</p>
-              <p className="text-2xl font-bold text-orange-800">₩{Math.round(statistics.avgCostPerPurchase).toLocaleString()}</p>
+              <p className="text-orange-600 text-xs font-medium">평균 매입 비용</p>
+              <p className="text-xl font-bold text-orange-800">₩{Math.round(statistics.avgCostPerPurchase).toLocaleString()}</p>
             </div>
-            <div className="w-12 h-12 bg-orange-200 rounded-full flex items-center justify-center">
-              <span className="text-orange-600 text-xl">📈</span>
+            <div className="w-8 h-8 bg-orange-200 rounded-full flex items-center justify-center">
+              <span className="text-orange-600 text-sm">📈</span>
             </div>
           </div>
         </div>

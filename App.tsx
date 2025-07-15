@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Product, Purchase, Sale, AppSettings, ProductOption } from './types';
 import { INITIAL_PRODUCTS, INITIAL_PURCHASES, INITIAL_SALES, INITIAL_SETTINGS, EMPTY_PRODUCTS, EMPTY_PURCHASES, EMPTY_SALES, CNY_TO_KRW_RATE } from './constants';
 import { DashboardIcon, ProductIcon, PurchaseIcon, SaleIcon, InventoryIcon, CalculatorIcon, SettingsIcon, LogoutIcon } from './components/icons/Icons';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Dashboard from './components/Dashboard';
 import Products from './components/Products';
 import Purchases from './components/Purchases';
@@ -12,6 +13,8 @@ import Sales from './components/Sales';
 import Inventory from './components/Inventory';
 import MarginCalculator from './components/MarginCalculator';
 import Settings from './components/Settings';
+import Login from './components/Login';
+import UserProfile from './components/UserProfile';
 
 type View = 'dashboard' | 'products' | 'purchases' | 'sales' | 'inventory' | 'calculator' | 'settings';
 
@@ -23,16 +26,17 @@ const NavItem: React.FC<{
 }> = ({ icon, label, isActive, onClick }) => (
   <button
     onClick={onClick}
-    className={`flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
-      isActive ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-200'
-    }`}
+    className={`flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${isActive ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-200'
+      }`}
   >
     {icon}
     <span className="ml-3">{label}</span>
   </button>
 );
 
-const App: React.FC = () => {
+// 메인 앱 컴포넌트 (인증된 사용자용)
+const MainApp: React.FC = () => {
+  const { currentUser, signOut } = useAuth();
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [purchases, setPurchases] = useState<Purchase[]>(INITIAL_PURCHASES);
   const [sales, setSales] = useState<Sale[]>(INITIAL_SALES);
@@ -65,7 +69,7 @@ const App: React.FC = () => {
       return product;
     }));
   };
-  
+
   const handleDeleteProduct = (productId: string) => {
     setProducts(prev => prev.filter(p => p.id !== productId));
   };
@@ -75,54 +79,54 @@ const App: React.FC = () => {
     setPurchases(prev => [...prev, newPurchase]);
 
     setProducts(prevProducts => {
-        const newProducts = JSON.parse(JSON.stringify(prevProducts));
+      const newProducts = JSON.parse(JSON.stringify(prevProducts));
 
-        // 1. Calculate total cost of the purchase in KRW
-        const totalItemsCostCny = newPurchase.items.reduce(
-            (sum, item) => sum + item.quantity * item.costCnyPerItem, 0
-        );
-        const totalItemsCostKrw = totalItemsCostCny * CNY_TO_KRW_RATE;
+      // 1. Calculate total cost of the purchase in KRW
+      const totalItemsCostCny = newPurchase.items.reduce(
+        (sum, item) => sum + item.quantity * item.costCnyPerItem, 0
+      );
+      const totalItemsCostKrw = totalItemsCostCny * CNY_TO_KRW_RATE;
 
 
-        const totalAdditionalCostsKrw = newPurchase.shippingCostKrw + newPurchase.customsFeeKrw + newPurchase.otherFeeKrw;
-        const totalPurchaseCostKrw = totalItemsCostKrw + totalAdditionalCostsKrw;
-        
-        // 2. Calculate total quantity in the purchase
-        const totalQuantity = newPurchase.items.reduce((sum, item) => sum + item.quantity, 0);
+      const totalAdditionalCostsKrw = newPurchase.shippingCostKrw + newPurchase.customsFeeKrw + newPurchase.otherFeeKrw;
+      const totalPurchaseCostKrw = totalItemsCostKrw + totalAdditionalCostsKrw;
 
-        // 3. Calculate the average landed cost per item for this specific purchase
-        const averageLandedCostPerItemKrw = totalQuantity > 0 ? totalPurchaseCostKrw / totalQuantity : 0;
+      // 2. Calculate total quantity in the purchase
+      const totalQuantity = newPurchase.items.reduce((sum, item) => sum + item.quantity, 0);
 
-        if (averageLandedCostPerItemKrw <= 0) {
-            // Nothing to update if cost is zero or negative, but still update stock
-            newPurchase.items.forEach(item => {
-                const product = newProducts.find((p: Product) => p.id === item.productId);
-                if (!product) return;
-                const option = product.options.find((o: any) => o.id === item.optionId);
-                if (!option) return;
-                option.stock += item.quantity;
-            });
-            return newProducts;
-        }
+      // 3. Calculate the average landed cost per item for this specific purchase
+      const averageLandedCostPerItemKrw = totalQuantity > 0 ? totalPurchaseCostKrw / totalQuantity : 0;
 
-        // 4. Update each product option's costOfGoods using moving average
+      if (averageLandedCostPerItemKrw <= 0) {
+        // Nothing to update if cost is zero or negative, but still update stock
         newPurchase.items.forEach(item => {
-            const product = newProducts.find((p: Product) => p.id === item.productId);
-            if (!product) return;
-
-            const option = product.options.find((o: any) => o.id === item.optionId);
-            if (!option) return;
-
-            const oldTotalValue = option.costOfGoods * option.stock;
-            const newItemsTotalValue = averageLandedCostPerItemKrw * item.quantity;
-            const newTotalStock = option.stock + item.quantity;
-
-            // Apply moving average formula
-            option.costOfGoods = newTotalStock > 0 ? (oldTotalValue + newItemsTotalValue) / newTotalStock : averageLandedCostPerItemKrw;
-            option.stock += item.quantity;
+          const product = newProducts.find((p: Product) => p.id === item.productId);
+          if (!product) return;
+          const option = product.options.find((o: any) => o.id === item.optionId);
+          if (!option) return;
+          option.stock += item.quantity;
         });
-
         return newProducts;
+      }
+
+      // 4. Update each product option's costOfGoods using moving average
+      newPurchase.items.forEach(item => {
+        const product = newProducts.find((p: Product) => p.id === item.productId);
+        if (!product) return;
+
+        const option = product.options.find((o: any) => o.id === item.optionId);
+        if (!option) return;
+
+        const oldTotalValue = option.costOfGoods * option.stock;
+        const newItemsTotalValue = averageLandedCostPerItemKrw * item.quantity;
+        const newTotalStock = option.stock + item.quantity;
+
+        // Apply moving average formula
+        option.costOfGoods = newTotalStock > 0 ? (oldTotalValue + newItemsTotalValue) / newTotalStock : averageLandedCostPerItemKrw;
+        option.stock += item.quantity;
+      });
+
+      return newProducts;
     });
   };
 
@@ -131,15 +135,15 @@ const App: React.FC = () => {
     setSales(prev => [...prev, newSale]);
 
     setProducts(prevProducts => {
-        const newProducts = JSON.parse(JSON.stringify(prevProducts));
-        const product = newProducts.find((p: Product) => p.id === newSale.productId);
-        if (product) {
-            const option = product.options.find((o: any) => o.id === newSale.optionId);
-            if (option) {
-                option.stock -= newSale.quantity;
-            }
+      const newProducts = JSON.parse(JSON.stringify(prevProducts));
+      const product = newProducts.find((p: Product) => p.id === newSale.productId);
+      if (product) {
+        const option = product.options.find((o: any) => o.id === newSale.optionId);
+        if (option) {
+          option.stock -= newSale.quantity;
         }
-        return newProducts;
+      }
+      return newProducts;
     });
   };
 
@@ -182,9 +186,9 @@ const App: React.FC = () => {
     { id: 'sales', label: '매출 관리', icon: <SaleIcon /> },
     { id: 'calculator', label: '마진 계산기', icon: <CalculatorIcon /> },
   ];
-  
+
   const bottomNavItems = [
-      { id: 'settings', label: '설정', icon: <SettingsIcon /> },
+    { id: 'settings', label: '설정', icon: <SettingsIcon /> },
   ]
 
   const renderContent = () => {
@@ -192,19 +196,19 @@ const App: React.FC = () => {
       case 'dashboard':
         return <Dashboard products={products} sales={sales} purchases={purchases} />;
       case 'products':
-        return <Products products={products} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct}/>;
+        return <Products products={products} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} />;
       case 'purchases':
-        return <Purchases purchases={purchases} products={products} onAddPurchase={handleAddPurchase}/>;
+        return <Purchases purchases={purchases} products={products} onAddPurchase={handleAddPurchase} />;
       case 'sales':
-        return <Sales sales={sales} products={products} settings={settings} onAddSale={handleAddSale}/>;
+        return <Sales sales={sales} products={products} settings={settings} onAddSale={handleAddSale} />;
       case 'inventory':
         return <Inventory products={products} />;
       case 'calculator':
         return <MarginCalculator products={products} onUpdateProductOption={handleUpdateProductOption} />;
       case 'settings':
-        return <Settings 
-          settings={settings} 
-          onUpdateSettings={handleUpdateSettings} 
+        return <Settings
+          settings={settings}
+          onUpdateSettings={handleUpdateSettings}
           onResetAllData={handleResetAllData}
           onCompleteReset={handleCompleteReset}
           onLoadSampleData={handleLoadSampleData}
@@ -233,27 +237,53 @@ const App: React.FC = () => {
           ))}
         </nav>
         <div className="px-4 py-6 border-t">
-           {bottomNavItems.map(item => (
-                <NavItem
-                  key={item.id}
-                  icon={item.icon}
-                  label={item.label}
-                  isActive={activeView === item.id}
-                  onClick={() => setActiveView(item.id as View)}
-                />
-            ))}
-           <div className="mt-2">
-            <NavItem icon={<LogoutIcon />} label="로그아웃" isActive={false} onClick={() => {}} />
-           </div>
+          {bottomNavItems.map(item => (
+            <NavItem
+              key={item.id}
+              icon={item.icon}
+              label={item.label}
+              isActive={activeView === item.id}
+              onClick={() => setActiveView(item.id as View)}
+            />
+          ))}
+          <div className="mt-4">
+            <UserProfile />
+          </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-8">
+      <main className="flex-1 overflow-y-auto p-6">
         {renderContent()}
       </main>
     </div>
   );
+};
+
+// 루트 App 컴포넌트 (인증 상태에 따라 Login 또는 MainApp 렌더링)
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+};
+
+const AppContent: React.FC = () => {
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return currentUser ? <MainApp /> : <Login />;
 };
 
 export default App;

@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { useState, useMemo } from 'react';
 import { Product, SalesChannel, ProductOption } from '../types';
-import Card from './ui/Card';
 import { CNY_TO_KRW_RATE } from '../constants';
 
 interface MarginCalculatorProps {
@@ -63,7 +62,6 @@ const MarginCalculator: React.FC<MarginCalculatorProps> = ({ products, onUpdateP
     if (product) {
       setData(prev => ({ ...prev, baseCostCny: product.baseCostCny }));
     } else {
-      // 직접 입력 모드로 전환 시 기본값 유지
       setData(prev => ({ ...prev, baseCostCny: prev.baseCostCny }));
     }
   };
@@ -72,7 +70,6 @@ const MarginCalculator: React.FC<MarginCalculatorProps> = ({ products, onUpdateP
     setSelectedOptionId(optionId);
     const option = selectedProduct?.options.find(o => o.id === optionId);
     if (option) {
-      // 선택된 옵션의 실제 원가를 기반으로 역산하여 매입가 추정
       const estimatedBaseCost = option.costOfGoods / CNY_TO_KRW_RATE;
       setData(prev => ({ ...prev, baseCostCny: estimatedBaseCost }));
     }
@@ -94,7 +91,6 @@ const MarginCalculator: React.FC<MarginCalculatorProps> = ({ products, onUpdateP
     const confirmMessage = `${selectedProduct.name} - ${selectedOption.name}에 권장 판매가 ₩${recommendedPrice.toLocaleString()}를 저장하시겠습니까?\n\n이 정보는 상품 관리에서 확인할 수 있습니다.`;
     
     if (window.confirm(confirmMessage)) {
-      // 실제로 상품 옵션에 권장 판매가 저장
       onUpdateProductOption(selectedProduct.id, selectedOption.id, {
         recommendedPrice: recommendedPrice
       });
@@ -120,24 +116,14 @@ const MarginCalculator: React.FC<MarginCalculatorProps> = ({ products, onUpdateP
     let netProfit = 0;
     
     if (data.calculationMode === 'margin') {
-      // 마진율 기준으로 판매가 계산
-      // 판매가 = 원가 / (1 - 마진율/100)
       const totalCostPerItem = actualCostPerItem + packagingCost + shippingCost;
       recommendedPrice = totalCostPerItem / (1 - data.targetMarginRate / 100);
-      
-      // 채널 수수료 고려한 실제 판매가
       recommendedPrice = recommendedPrice / (1 - data.channelFeePercentage / 100);
-      
     } else if (data.calculationMode === 'profit') {
-      // 순이익률 기준으로 판매가 계산
       const totalCostPerItem = actualCostPerItem + packagingCost + shippingCost;
       recommendedPrice = totalCostPerItem * (1 + data.targetProfitRate / 100);
-      
-      // 채널 수수료 고려한 실제 판매가
       recommendedPrice = recommendedPrice / (1 - data.channelFeePercentage / 100);
-      
     } else {
-      // 사용자 지정 판매가
       recommendedPrice = data.customSalePrice;
     }
     
@@ -152,15 +138,15 @@ const MarginCalculator: React.FC<MarginCalculatorProps> = ({ products, onUpdateP
     actualProfitRate = totalCosts > 0 ? (netProfit / totalCosts) * 100 : 0;
     
     // 5. 투자 회수 분석
-    const totalInvestment = totalPurchaseCost; // 총 투자금 (매입비용 + 추가비용)
-    const breakEvenQuantity = netRevenue > 0 ? totalInvestment / netRevenue : 0; // 투자 회수 필요 판매량 (실제 수취액 기준)
+    const totalInvestment = totalPurchaseCost;
+    const breakEvenQuantity = netRevenue > 0 ? totalInvestment / netRevenue : 0;
     
     // 6. 전체 수량 판매 시 수익 분석
-    const totalRevenue = recommendedPrice * data.quantity; // 총 매출
-    const totalChannelFee = totalRevenue * (data.channelFeePercentage / 100); // 총 채널 수수료
-    const totalSellingCosts = (packagingCost + shippingCost) * data.quantity; // 총 판매 비용 (포장비 + 배송비)
-    const totalNetProfit = totalRevenue - totalChannelFee - totalPurchaseCost - totalSellingCosts; // 순 총 수익
-    const roi = totalInvestment > 0 ? (totalNetProfit / totalInvestment) * 100 : 0; // 투자 대비 수익률 (ROI)
+    const totalRevenue = recommendedPrice * data.quantity;
+    const totalChannelFee = totalRevenue * (data.channelFeePercentage / 100);
+    const totalSellingCosts = (packagingCost + shippingCost) * data.quantity;
+    const totalNetProfit = totalRevenue - totalChannelFee - totalPurchaseCost - totalSellingCosts;
+    const roi = totalInvestment > 0 ? (totalNetProfit / totalInvestment) * 100 : 0;
     
     return {
       baseCostKrw,
@@ -174,10 +160,8 @@ const MarginCalculator: React.FC<MarginCalculatorProps> = ({ products, onUpdateP
       actualMarginRate,
       actualProfitRate,
       totalCosts,
-      // 투자 회수 분석
       totalInvestment,
       breakEvenQuantity,
-      // 전체 판매 시 수익 분석
       totalRevenue,
       totalChannelFee,
       totalSellingCosts,
@@ -191,7 +175,7 @@ const MarginCalculator: React.FC<MarginCalculatorProps> = ({ products, onUpdateP
   };
 
   const handleChannelChange = (channel: SalesChannel) => {
-    let feePercentage = 5.5; // 기본값
+    let feePercentage = 5.5;
     switch (channel) {
       case SalesChannel.SMART_STORE:
         feePercentage = 5.5;
@@ -216,490 +200,436 @@ const MarginCalculator: React.FC<MarginCalculatorProps> = ({ products, onUpdateP
   const formatCurrency = (value: number) => `₩${Math.round(value).toLocaleString()}`;
 
   return (
-    <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">🧮 마진 계산기</h1>
-        <p className="text-gray-600">매입부터 판매까지 모든 비용을 고려한 정확한 수익성 분석</p>
-      </div>
-
-      {/* 핵심 결과 요약 - 상단에 배치 */}
-      {(data.baseCostCny > 0 || data.customSalePrice > 0) && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 text-center">📊 계산 결과 요약</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-sm text-gray-600 mb-1">권장 판매가</div>
-              <div className="text-2xl font-bold text-blue-600">{formatCurrency(calculations.recommendedPrice)}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-600 mb-1">개당 순이익</div>
-              <div className={`text-2xl font-bold ${calculations.netProfit > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(calculations.netProfit)}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* 모던한 헤더 */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-lg">
+                🧮
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                  마진 계산기
+                </h1>
+                <p className="text-gray-600 mt-1">매입부터 판매까지 정확한 수익성 분석</p>
               </div>
             </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-600 mb-1">마진율</div>
-              <div className="text-2xl font-bold text-purple-600">{calculations.actualMarginRate.toFixed(1)}%</div>
-            </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-600 mb-1">투자 회수량</div>
-              <div className="text-2xl font-bold text-orange-600">
-                {calculations.breakEvenQuantity > 0 ? `${Math.ceil(calculations.breakEvenQuantity)}개` : '-'}
+            {selectedProduct && selectedOption && calculations.recommendedPrice > 0 && (
+              <button
+                onClick={applyToProduct}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              >
+                상품에 판매가 저장
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 핵심 결과 요약 - 모던한 대시보드 스타일 */}
+        {(data.baseCostCny > 0 || data.customSalePrice > 0) && (
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white shadow-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-blue-100 text-sm font-medium">권장 판매가</div>
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">💰</div>
+                </div>
+                <div className="text-2xl font-bold">{formatCurrency(calculations.recommendedPrice)}</div>
+              </div>
+              
+              <div className={`rounded-xl p-4 text-white shadow-lg ${calculations.netProfit > 0 
+                ? 'bg-gradient-to-br from-green-500 to-green-600' 
+                : 'bg-gradient-to-br from-red-500 to-red-600'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-white/90 text-sm font-medium">개당 순이익</div>
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                    {calculations.netProfit > 0 ? '📈' : '📉'}
+                  </div>
+                </div>
+                <div className="text-2xl font-bold">{formatCurrency(calculations.netProfit)}</div>
+              </div>
+              
+              <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 text-white shadow-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-purple-100 text-sm font-medium">마진율</div>
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">📊</div>
+                </div>
+                <div className="text-2xl font-bold">{calculations.actualMarginRate.toFixed(1)}%</div>
+              </div>
+              
+              <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-4 text-white shadow-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-orange-100 text-sm font-medium">투자 회수량</div>
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">🎯</div>
+                </div>
+                <div className="text-2xl font-bold">
+                  {calculations.breakEvenQuantity > 0 ? `${Math.ceil(calculations.breakEvenQuantity)}개` : '-'}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* 입력 섹션 - 컴팩트하게 통합 */}
-        <div className="space-y-4">
-          {/* 상품 선택 */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-              🎯 상품 선택 (선택사항)
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">상품</label>
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => handleProductSelect(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">직접 입력 모드</option>
-                  {products.map(product => (
-                    <option key={product.id} value={product.id}>{product.name}</option>
-                  ))}
-                </select>
-              </div>
+        {/* 심플한 2x2 그리드 레이아웃 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+          {/* 1. 상품 선택 & 비용 설정 통합 */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+            <div className="flex items-center space-x-2 mb-6">
+              <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-sm">🎯</div>
+              <h3 className="text-lg font-semibold text-gray-800">상품 선택 & 비용 설정</h3>
+            </div>
+            
+            {/* 상품 선택 */}
+            <div className="space-y-3 mb-6">
+              <select
+                value={selectedProductId}
+                onChange={(e) => handleProductSelect(e.target.value)}
+                className="w-full px-4 py-3 text-sm bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              >
+                <option value="">직접 입력 모드</option>
+                {products.map(product => (
+                  <option key={product.id} value={product.id}>{product.name}</option>
+                ))}
+              </select>
               
               {selectedProductId && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">옵션</label>
-                  <select
-                    value={selectedOptionId}
-                    onChange={(e) => handleOptionSelect(e.target.value)}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">옵션 선택</option>
-                    {selectedProduct?.options.map(option => (
-                      <option key={option.id} value={option.id}>
-                        {option.name} (재고: {option.stock}개, 원가: ₩{Math.round(option.costOfGoods).toLocaleString()})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={selectedOptionId}
+                  onChange={(e) => handleOptionSelect(e.target.value)}
+                  className="w-full px-4 py-3 text-sm bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+                  <option value="">옵션 선택</option>
+                  {selectedProduct?.options.map(option => (
+                    <option key={option.id} value={option.id}>
+                      {option.name} (재고: {option.stock}개)
+                    </option>
+                  ))}
+                </select>
               )}
               
-              {selectedProduct && selectedOption && calculations.recommendedPrice > 0 && (
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-blue-800">선택된 상품</span>
-                    <button
-                      onClick={applyToProduct}
-                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
-                    >
-                      판매가 메모
-                    </button>
-                  </div>
-                  <div className="text-xs text-blue-700">
-                    <div>{selectedProduct.name} - {selectedOption.name}</div>
-                    <div>현재 원가: ₩{Math.round(selectedOption.costOfGoods).toLocaleString()}</div>
-                    <div>권장 판매가: ₩{Math.round(calculations.recommendedPrice).toLocaleString()}</div>
-                  </div>
+              {selectedProduct && selectedOption && (
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                  <div className="font-medium text-blue-800">{selectedProduct.name} - {selectedOption.name}</div>
+                  <div className="text-sm text-blue-600 mt-1">원가: ₩{Math.round(selectedOption.costOfGoods).toLocaleString()}</div>
                 </div>
               )}
             </div>
-          </Card>
 
-          {/* 매입 정보 */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-              📦 매입 정보
-            </h3>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+            {/* 매입 비용 */}
+            <div className="border-t pt-6">
+              <h4 className="text-md font-medium text-gray-700 mb-4 flex items-center">
+                <span className="w-6 h-6 bg-green-500 rounded-lg flex items-center justify-center text-white text-xs mr-2">📦</span>
+                매입 비용
+              </h4>
+              <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">매입가 (¥)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">매입가 (¥)</label>
                   <input
                     type="number"
                     value={data.baseCostCny}
                     onChange={(e) => handleInputChange('baseCostCny', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                     step="0.01"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">수량</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">수량</label>
                   <input
                     type="number"
                     value={data.quantity}
                     onChange={(e) => handleInputChange('quantity', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="1"
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                     min="1"
                   />
                 </div>
               </div>
-              
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">배송비</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">배송비</label>
                   <input
                     type="number"
                     value={data.shippingCostKrw}
                     onChange={(e) => handleInputChange('shippingCostKrw', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">관세</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">관세</label>
                   <input
                     type="number"
                     value={data.customsFeeKrw}
                     onChange={(e) => handleInputChange('customsFeeKrw', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">기타</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">기타</label>
                   <input
                     type="number"
                     value={data.otherFeeKrw}
                     onChange={(e) => handleInputChange('otherFeeKrw', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                   />
                 </div>
               </div>
             </div>
-          </Card>
+          </div>
 
-          {/* 판매 정보 */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-              🛒 판매 정보
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">판매 채널</label>
-                <select
-                  value={data.channel}
-                  onChange={(e) => handleChannelChange(e.target.value as SalesChannel)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value={SalesChannel.SMART_STORE}>스마트스토어 (5.5%)</option>
-                  <option value={SalesChannel.COUPANG}>쿠팡 (10.8%)</option>
-                  <option value={SalesChannel.OWN_MALL}>자사몰 (2.0%)</option>
-                  <option value={SalesChannel.OTHER}>기타</option>
-                </select>
-              </div>
+          {/* 2. 판매 설정 & 가격 계산 통합 */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+            <div className="flex items-center space-x-2 mb-6">
+              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center text-white text-sm">🛒</div>
+              <h3 className="text-lg font-semibold text-gray-800">판매 설정 & 가격 계산</h3>
+            </div>
+            
+            {/* 판매 정보 */}
+            <div className="space-y-4 mb-6">
+              <select
+                value={data.channel}
+                onChange={(e) => handleChannelChange(e.target.value as SalesChannel)}
+                className="w-full px-4 py-3 text-sm bg-white/70 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+              >
+                <option value={SalesChannel.SMART_STORE}>스마트스토어</option>
+                <option value={SalesChannel.COUPANG}>쿠팡</option>
+                <option value={SalesChannel.OWN_MALL}>자사몰</option>
+                <option value={SalesChannel.OTHER}>기타</option>
+              </select>
               
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">수수료(%)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">수수료 (%)</label>
                   <input
                     type="number"
                     value={data.channelFeePercentage}
                     onChange={(e) => handleInputChange('channelFeePercentage', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="5.5"
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                     step="0.1"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">포장비</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">포장비</label>
                   <input
                     type="number"
                     value={data.packagingCostKrw}
                     onChange={(e) => handleInputChange('packagingCostKrw', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="500"
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">국내배송</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">배송비</label>
                   <input
                     type="number"
                     value={data.domesticShippingKrw}
                     onChange={(e) => handleInputChange('domesticShippingKrw', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="3000"
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                   />
                 </div>
               </div>
             </div>
-          </Card>
 
-          {/* 계산 모드 */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
-              🎯 계산 모드
-            </h3>
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-2">
-                <label className="flex items-center text-sm">
+            {/* 계산 모드 */}
+            <div className="border-t pt-6">
+              <h4 className="text-md font-medium text-gray-700 mb-4 flex items-center">
+                <span className="w-6 h-6 bg-purple-500 rounded-lg flex items-center justify-center text-white text-xs mr-2">🎯</span>
+                계산 모드
+              </h4>
+              <div className="space-y-3">
+                <label className="flex items-center p-3 bg-white/50 rounded-xl border border-gray-200 hover:bg-white/70 transition-all cursor-pointer">
                   <input
                     type="radio"
                     name="calculationMode"
                     value="margin"
                     checked={data.calculationMode === 'margin'}
                     onChange={(e) => handleInputChange('calculationMode', e.target.value)}
-                    className="mr-2"
+                    className="mr-3 w-4 h-4 text-purple-600"
                   />
-                  마진율 기준
+                  <span className="text-sm font-medium text-gray-700">마진율 기준</span>
                 </label>
-                <label className="flex items-center text-sm">
+                {data.calculationMode === 'margin' && (
+                  <input
+                    type="number"
+                    value={data.targetMarginRate}
+                    onChange={(e) => handleInputChange('targetMarginRate', Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    placeholder="목표 마진율 (%)"
+                    step="0.1"
+                  />
+                )}
+                
+                <label className="flex items-center p-3 bg-white/50 rounded-xl border border-gray-200 hover:bg-white/70 transition-all cursor-pointer">
                   <input
                     type="radio"
                     name="calculationMode"
                     value="profit"
                     checked={data.calculationMode === 'profit'}
                     onChange={(e) => handleInputChange('calculationMode', e.target.value)}
-                    className="mr-2"
+                    className="mr-3 w-4 h-4 text-purple-600"
                   />
-                  순이익률 기준
+                  <span className="text-sm font-medium text-gray-700">순이익률 기준</span>
                 </label>
-                <label className="flex items-center text-sm">
+                {data.calculationMode === 'profit' && (
+                  <input
+                    type="number"
+                    value={data.targetProfitRate}
+                    onChange={(e) => handleInputChange('targetProfitRate', Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    placeholder="목표 순이익률 (%)"
+                    step="0.1"
+                  />
+                )}
+                
+                <label className="flex items-center p-3 bg-white/50 rounded-xl border border-gray-200 hover:bg-white/70 transition-all cursor-pointer">
                   <input
                     type="radio"
                     name="calculationMode"
                     value="price"
                     checked={data.calculationMode === 'price'}
                     onChange={(e) => handleInputChange('calculationMode', e.target.value)}
-                    className="mr-2"
+                    className="mr-3 w-4 h-4 text-purple-600"
                   />
-                  판매가 직접 입력
+                  <span className="text-sm font-medium text-gray-700">직접 입력</span>
                 </label>
-              </div>
-              
-              {data.calculationMode === 'margin' && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">목표 마진율 (%)</label>
-                  <input
-                    type="number"
-                    value={data.targetMarginRate}
-                    onChange={(e) => handleInputChange('targetMarginRate', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="50"
-                    step="0.1"
-                  />
-                </div>
-              )}
-              
-              {data.calculationMode === 'profit' && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">목표 순이익률 (%)</label>
-                  <input
-                    type="number"
-                    value={data.targetProfitRate}
-                    onChange={(e) => handleInputChange('targetProfitRate', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="30"
-                    step="0.1"
-                  />
-                </div>
-              )}
-              
-              {data.calculationMode === 'price' && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">판매가 (₩)</label>
+                {data.calculationMode === 'price' && (
                   <input
                     type="number"
                     value={data.customSalePrice}
                     onChange={(e) => handleInputChange('customSalePrice', Number(e.target.value))}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0"
+                    className="w-full px-3 py-2 bg-white/70 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    placeholder="판매가 (₩)"
                   />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 3. 수익성 분석 & 투자 회수 통합 */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+            <div className="flex items-center space-x-2 mb-6">
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center text-white text-sm">📈</div>
+              <h3 className="text-lg font-semibold text-gray-800">수익성 분석 & 투자 회수</h3>
+            </div>
+            
+            {/* 수익성 지표 */}
+            <div className="space-y-4 mb-6">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-3 rounded-xl text-center border border-blue-200">
+                  <div className="text-xs text-blue-600 font-medium mb-1">마진율</div>
+                  <div className="text-lg font-bold text-blue-800">{calculations.actualMarginRate.toFixed(1)}%</div>
+                </div>
+                <div className="bg-gradient-to-r from-green-50 to-emerald-100 p-3 rounded-xl text-center border border-green-200">
+                  <div className="text-xs text-green-600 font-medium mb-1">순이익률</div>
+                  <div className="text-lg font-bold text-green-800">{calculations.actualProfitRate.toFixed(1)}%</div>
+                </div>
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-3 rounded-xl text-center border border-gray-200">
+                  <div className="text-xs text-gray-600 font-medium mb-1">개당 순이익</div>
+                  <div className={`text-lg font-bold ${calculations.netProfit > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(calculations.netProfit)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 투자 회수 */}
+            <div className="border-t pt-6">
+              <h4 className="text-md font-medium text-gray-700 mb-4 flex items-center">
+                <span className="w-6 h-6 bg-red-500 rounded-lg flex items-center justify-center text-white text-xs mr-2">💸</span>
+                투자 회수 분석
+              </h4>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-gradient-to-r from-red-50 to-red-100 p-4 rounded-xl text-center border border-red-200">
+                  <div className="text-sm text-red-600 font-medium mb-1">총 투자금</div>
+                  <div className="text-xl font-bold text-red-800">{formatCurrency(calculations.totalInvestment)}</div>
+                </div>
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-xl text-center border border-blue-200">
+                  <div className="text-sm text-blue-600 font-medium mb-1">회수 필요량</div>
+                  <div className="text-xl font-bold text-blue-800">
+                    {calculations.breakEvenQuantity > 0 ? `${Math.ceil(calculations.breakEvenQuantity)}개` : '불가'}
+                  </div>
+                </div>
+              </div>
+              
+              {calculations.breakEvenQuantity > 0 && calculations.breakEvenQuantity <= data.quantity && (
+                <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-3 rounded-xl text-center font-medium">
+                  ✅ 회수 가능
+                </div>
+              )}
+              {calculations.breakEvenQuantity > data.quantity && calculations.breakEvenQuantity > 0 && (
+                <div className="bg-gradient-to-r from-orange-500 to-amber-600 text-white p-3 rounded-xl text-center font-medium">
+                  ⚠️ {Math.ceil(calculations.breakEvenQuantity - data.quantity)}개 추가 필요
+                </div>
+              )}
+              {calculations.breakEvenQuantity <= 0 && (
+                <div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-3 rounded-xl text-center font-medium">
+                  ❌ 회수 불가
                 </div>
               )}
             </div>
-          </Card>
-        </div>
+          </div>
 
-        {/* 기본 분석 결과 */}
-        <div className="space-y-4">
-          {/* 원가 & 판매가 통합 */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">💰 원가 & 판매가</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">기본 매입가</span>
-                <span className="font-medium">{formatCurrency(calculations.baseCostKrw)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">실제 개당 원가</span>
-                <span className="font-medium text-orange-600">{formatCurrency(calculations.actualCostPerItem)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">판매 부대비용</span>
-                <span className="font-medium">{formatCurrency(data.packagingCostKrw + data.domesticShippingKrw)}</span>
-              </div>
-              <div className="flex justify-between border-t pt-2 font-semibold">
-                <span className="text-gray-800">총 비용 (개당)</span>
-                <span className="text-red-600">{formatCurrency(calculations.totalCostPerItem)}</span>
-              </div>
-              <div className="bg-blue-50 p-3 rounded-lg mt-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-blue-800 font-semibold">권장 판매가</span>
-                  <span className="text-xl font-bold text-blue-600">{formatCurrency(calculations.recommendedPrice)}</span>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* 수익성 지표 */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">📈 수익성 지표</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-blue-50 p-3 rounded-lg text-center">
-                <div className="text-xs text-blue-600 font-medium">마진율</div>
-                <div className="text-xl font-bold text-blue-800">{calculations.actualMarginRate.toFixed(1)}%</div>
-              </div>
-              <div className="bg-green-50 p-3 rounded-lg text-center">
-                <div className="text-xs text-green-600 font-medium">순이익률</div>
-                <div className="text-xl font-bold text-green-800">{calculations.actualProfitRate.toFixed(1)}%</div>
-              </div>
-            </div>
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">채널 수수료</span>
-                <span className="text-red-500">-{formatCurrency(calculations.channelFee)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">실제 수취액</span>
-                <span className="font-medium">{formatCurrency(calculations.netRevenue)}</span>
-              </div>
-              <div className="flex justify-between border-t pt-2 font-semibold">
-                <span className="text-gray-800">개당 순이익</span>
-                <span className={calculations.netProfit > 0 ? 'text-green-600' : 'text-red-600'}>
-                  {formatCurrency(calculations.netProfit)}
-                </span>
-              </div>
-            </div>
-          </Card>
-
-          {/* 손익분기점 */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">⚖️ 손익분기점</h3>
-            <div className="bg-orange-50 p-3 rounded-lg">
-              <div className="text-center">
-                <div className="text-xs text-orange-600 font-medium">최소 판매가</div>
-                <div className="text-lg font-bold text-orange-800">
-                  {formatCurrency(calculations.totalCostPerItem / (1 - data.channelFeePercentage / 100))}
-                </div>
-              </div>
-            </div>
-            <div className="text-xs text-gray-500 mt-2 text-center">
-              채널 수수료를 고려한 최소 판매가
-            </div>
-          </Card>
-        </div>
-
-        {/* 투자 & 수익 분석 */}
-        <div className="space-y-4">
-          {/* 투자 회수 분석 */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">💸 투자 회수 분석</h3>
-            <div className="space-y-2 text-sm">
-              <div className="bg-red-50 p-3 rounded-lg">
-                <div className="text-center">
-                  <div className="text-xs text-red-600 font-medium">총 투자금</div>
-                  <div className="text-lg font-bold text-red-800">{formatCurrency(calculations.totalInvestment)}</div>
-                </div>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">개당 수취액</span>
-                <span className="font-medium text-green-600">{formatCurrency(calculations.netRevenue)}</span>
-              </div>
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <div className="text-center">
-                  <div className="text-xs text-blue-600 font-medium">회수 필요 판매량</div>
-                  <div className="text-lg font-bold text-blue-800">
-                    {calculations.breakEvenQuantity > 0 ? `${Math.ceil(calculations.breakEvenQuantity)}개` : '회수 불가'}
-                  </div>
-                </div>
-              </div>
+          {/* 4. 상세 분석 & 전체 수익 통합 */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+            <div className="flex items-center space-x-2 mb-6">
+              <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center text-white text-sm">💰</div>
+              <h3 className="text-lg font-semibold text-gray-800">상세 분석 & 전체 수익</h3>
             </div>
             
-            {calculations.breakEvenQuantity > 0 && calculations.breakEvenQuantity <= data.quantity && (
-              <div className="text-xs text-green-600 bg-green-50 p-2 rounded mt-3">
-                ✅ 매입 수량 내에서 투자금 회수 가능
+            {/* 원가 분석 */}
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span className="text-gray-600 font-medium">기본 매입가</span>
+                <span className="font-bold text-gray-800">{formatCurrency(calculations.baseCostKrw)}</span>
               </div>
-            )}
-            {calculations.breakEvenQuantity > data.quantity && calculations.breakEvenQuantity > 0 && (
-              <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded mt-3">
-                ⚠️ {Math.ceil(calculations.breakEvenQuantity - data.quantity)}개 추가 판매 필요
+              <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                <span className="text-gray-600 font-medium">실제 개당 원가</span>
+                <span className="font-bold text-orange-600">{formatCurrency(calculations.actualCostPerItem)}</span>
               </div>
-            )}
-            {calculations.breakEvenQuantity <= 0 && (
-              <div className="text-xs text-red-600 bg-red-50 p-2 rounded mt-3">
-                ❌ 현재 판매가로는 투자금 회수 불가능
+              <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                <span className="text-gray-600 font-medium">판매 부대비용</span>
+                <span className="font-bold text-blue-600">{formatCurrency(data.packagingCostKrw + data.domesticShippingKrw)}</span>
               </div>
-            )}
-          </Card>
+              <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg border-2 border-red-200">
+                <span className="text-gray-800 font-semibold">총 비용</span>
+                <span className="font-bold text-red-600 text-lg">{formatCurrency(calculations.totalCostPerItem)}</span>
+              </div>
+            </div>
 
-          {/* 전체 판매 시 수익 */}
-          <Card>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">🎯 전체 판매 시 수익</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">매입 수량</span>
-                <span className="font-medium">{data.quantity}개</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">총 매출</span>
-                <span className="font-medium text-blue-600">{formatCurrency(calculations.totalRevenue)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">총 수수료</span>
-                <span className="text-red-500">-{formatCurrency(calculations.totalChannelFee)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">총 판매비용</span>
-                <span className="text-red-500">-{formatCurrency(calculations.totalSellingCosts)}</span>
-              </div>
-              <div className="border-t pt-2">
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-lg">
-                  <div className="text-center">
-                    <div className="text-xs text-green-600 font-medium">순 총 수익</div>
-                    <div className={`text-xl font-bold ${calculations.totalNetProfit > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrency(calculations.totalNetProfit)}
-                    </div>
-                  </div>
+            {/* 전체 판매 수익 */}
+            <div className="border-t pt-6">
+              <h4 className="text-md font-medium text-gray-700 mb-4 flex items-center">
+                <span className="w-6 h-6 bg-teal-500 rounded-lg flex items-center justify-center text-white text-xs mr-2">🎯</span>
+                전체 판매 수익 ({data.quantity}개)
+              </h4>
+              
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-100 p-3 rounded-xl text-center border border-green-200">
+                  <div className="text-sm text-green-600 font-medium mb-1">총 매출</div>
+                  <div className="text-lg font-bold text-green-800">{formatCurrency(calculations.totalRevenue)}</div>
                 </div>
-              </div>
-              <div className="bg-purple-50 p-3 rounded-lg">
-                <div className="text-center">
-                  <div className="text-xs text-purple-600 font-medium">투자 수익률 (ROI)</div>
-                  <div className={`text-lg font-bold ${calculations.roi > 0 ? 'text-purple-600' : 'text-red-600'}`}>
+                <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-3 rounded-xl text-center border border-purple-200">
+                  <div className="text-sm text-purple-600 font-medium mb-1">ROI</div>
+                  <div className={`text-lg font-bold ${calculations.roi > 0 ? 'text-purple-800' : 'text-red-600'}`}>
                     {calculations.roi.toFixed(1)}%
                   </div>
                 </div>
               </div>
+              
+              <div className={`p-4 rounded-xl text-center ${calculations.totalNetProfit > 0 
+                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white' 
+                : 'bg-gradient-to-r from-red-500 to-red-600 text-white'}`}>
+                <div className="text-white/90 font-medium mb-1">순 총 수익</div>
+                <div className="text-2xl font-bold">
+                  {formatCurrency(calculations.totalNetProfit)}
+                </div>
+                <div className="text-white/80 text-sm mt-1">
+                  {calculations.totalNetProfit > 0 ? '✅ 수익 예상' : '❌ 손실 예상'}
+                </div>
+              </div>
             </div>
-            
-            {calculations.totalNetProfit > 0 ? (
-              <div className="mt-3 p-3 bg-green-50 rounded-lg">
-                <div className="text-xs text-green-800 text-center">
-                  <strong>💡 전체 {data.quantity}개 판매 시</strong><br/>
-                  <strong>{formatCurrency(calculations.totalNetProfit)}</strong> 순이익 예상
-                </div>
-              </div>
-            ) : (
-              <div className="mt-3 p-3 bg-red-50 rounded-lg">
-                <div className="text-xs text-red-800 text-center">
-                  <strong>⚠️ 손실 예상</strong><br/>
-                  판매가 조정 필요
-                </div>
-              </div>
-            )}
-          </Card>
+          </div>
+
         </div>
       </div>
     </div>
