@@ -131,7 +131,6 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, onReset
                 onClick={onCompleteReset}
                 className="w-full bg-red-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-red-700 transition duration-300"
               >
-                <ResetDataIcon className="inline mr-2" />
                 완전 초기화
               </button>
             </div>
