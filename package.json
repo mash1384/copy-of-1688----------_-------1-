@@ -1,8 +1,9 @@
 {
-  "name": "copy-of-1688-의류-사업자-재고/매출-관리",
+  "name": "bizmanager-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "1688 의류 사업자 재고/매출 관리 시스템",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,19 +12,16 @@
   "dependencies": {
     "firebase": "^11.10.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "recharts": "^3.1.0"
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.11",
     "@types/node": "^22.14.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "@types/recharts": "^1.8.29",
-    "@vitejs/plugin-react": "^4.6.0",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.11",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^3.4.17",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"
   }
