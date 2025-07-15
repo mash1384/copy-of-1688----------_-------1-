@@ -18,7 +18,7 @@ const Purchases: React.FC<PurchasesProps> = ({ purchases, products, onAddPurchas
   const [sortBy, setSortBy] = useState<'date' | 'cost' | 'items'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedPurchase, setSelectedPurchase] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
 
   const getProductInfo = (productId: string, optionId: string) => {
     const product = products.find(p => p.id === productId);
@@ -126,37 +126,13 @@ const Purchases: React.FC<PurchasesProps> = ({ purchases, products, onAddPurchas
                 <p className="text-slate-600 mt-1">스마트한 매입 관리와 원가 분석</p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <div className="flex bg-slate-100 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    viewMode === 'grid' 
-                      ? 'bg-white text-slate-900 shadow-sm' 
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  그리드
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    viewMode === 'list' 
-                      ? 'bg-white text-slate-900 shadow-sm' 
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  리스트
-                </button>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-              >
-                <PlusIcon className="w-4 h-4 mr-2" />
-                새 매입
-              </button>
-            </div>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <PlusIcon className="w-4 h-4 mr-2" />
+              새 매입
+            </button>
           </div>
         </div>
 
@@ -260,133 +236,6 @@ const Purchases: React.FC<PurchasesProps> = ({ purchases, products, onAddPurchas
               <PlusIcon className="w-4 h-4 mr-2" />
               매입 등록하기
             </button>
-          </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredAndSortedPurchases.map(purchase => {
-              const totalCost = calculateTotalPurchaseCost(purchase);
-              const totalQuantity = purchase.items.reduce((sum, item) => sum + item.quantity, 0);
-              const isSelected = selectedPurchase === purchase.id;
-
-              return (
-                <div
-                  key={purchase.id}
-                  className={`bg-white rounded-xl shadow-sm border transition-all cursor-pointer ${
-                    isSelected 
-                      ? 'border-blue-500 ring-2 ring-blue-200' 
-                      : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
-                  }`}
-                  onClick={() => setSelectedPurchase(isSelected ? null : purchase.id)}
-                >
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                          매입 #{purchase.id}
-                        </h3>
-                        <p className="text-sm text-slate-500">
-                          {new Date(purchase.date).toLocaleDateString('ko-KR')}
-                        </p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                          {purchase.items.length}개 상품
-                        </span>
-                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                          {totalQuantity}개
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
-                      <div className="text-2xl font-bold text-slate-900 mb-1">
-                        {formatCurrency(totalCost)}
-                      </div>
-                      <div className="flex space-x-4 text-sm text-slate-600">
-                        {purchase.shippingCostKrw > 0 && (
-                          <span>배송비 {formatCurrency(purchase.shippingCostKrw)}</span>
-                        )}
-                        {purchase.customsFeeKrw > 0 && (
-                          <span>관세 {formatCurrency(purchase.customsFeeKrw)}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 상품 미리보기 */}
-                    <div className="space-y-2">
-                      {purchase.items.slice(0, 2).map(item => {
-                        const { productName, optionName } = getProductInfo(item.productId, item.optionId);
-                        return (
-                          <div key={`${purchase.id}-${item.optionId}`} className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
-                            <div>
-                              <p className="text-sm font-medium text-slate-900">
-                                {productName || '삭제된 상품'}
-                              </p>
-                              <p className="text-xs text-slate-600">
-                                {optionName || '삭제된 옵션'} • {item.quantity}개
-                              </p>
-                            </div>
-                            <div className="text-sm font-medium text-slate-900">
-                              ¥{item.costCnyPerItem.toFixed(2)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {purchase.items.length > 2 && (
-                        <div className="text-center py-2 text-sm text-slate-500">
-                          +{purchase.items.length - 2}개 더보기
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 상세 정보 (확장 시) */}
-                  {isSelected && (
-                    <div className="border-t border-slate-200 p-6 bg-slate-50">
-                      <h4 className="font-semibold text-slate-900 mb-4">상세 내역</h4>
-                      <div className="space-y-3">
-                        {purchase.items.map(item => {
-                          const { productName, optionName } = getProductInfo(item.productId, item.optionId);
-                          const actualCost = calculateActualCostPerItem(purchase, item);
-                          const baseCostKrw = item.costCnyPerItem * CNY_TO_KRW_RATE;
-                          const totalItemCost = actualCost * item.quantity;
-
-                          return (
-                            <div key={`${purchase.id}-${item.optionId}`} className="bg-white p-4 rounded-lg">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <h5 className="font-medium text-slate-900 mb-1">
-                                    {productName || '삭제된 상품'}
-                                  </h5>
-                                  <p className="text-sm text-slate-600 mb-2">
-                                    {optionName || '삭제된 옵션'}
-                                  </p>
-                                  <div className="flex space-x-3 text-xs text-slate-500">
-                                    <span>수량: {item.quantity}개</span>
-                                    <span>단가: ¥{item.costCnyPerItem.toFixed(2)}</span>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm text-slate-600">
-                                    기본: {formatCurrency(baseCostKrw)}
-                                  </p>
-                                  <p className="text-sm font-semibold text-blue-600">
-                                    실제: {formatCurrency(actualCost)}
-                                  </p>
-                                  <p className="text-lg font-bold text-slate-900">
-                                    {formatCurrency(totalItemCost)}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
         ) : (
           <div className="space-y-4">
