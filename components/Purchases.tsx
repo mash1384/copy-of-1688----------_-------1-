@@ -1,13 +1,10 @@
-
 import * as React from 'react';
 import { useState, useMemo, useEffect } from 'react';
 import { Purchase, Product, PurchaseItem } from '../types';
-import Card from './ui/Card';
 import { CNY_TO_KRW_RATE } from '../constants';
 import Modal from './ui/Modal';
 import PurchaseForm from './forms/PurchaseForm';
 import { PlusIcon } from './icons/Icons';
-
 
 interface PurchasesProps {
   purchases: Purchase[];
@@ -20,8 +17,8 @@ const Purchases: React.FC<PurchasesProps> = ({ purchases, products, onAddPurchas
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'cost' | 'items'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
-  const [expandedPurchases, setExpandedPurchases] = useState<Set<string>>(new Set());
+  const [selectedPurchase, setSelectedPurchase] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const getProductInfo = (productId: string, optionId: string) => {
     const product = products.find(p => p.id === productId);
@@ -34,7 +31,7 @@ const Purchases: React.FC<PurchasesProps> = ({ purchases, products, onAddPurchas
     const itemsTotalKrw = itemsTotalCny * CNY_TO_KRW_RATE;
     const additionalCosts = purchase.shippingCostKrw + purchase.customsFeeKrw + purchase.otherFeeKrw;
     return itemsTotalKrw + additionalCosts;
-  }
+  };
 
   const calculateActualCostPerItem = (purchase: Purchase, item: PurchaseItem) => {
     const itemBaseCostKrw = item.costCnyPerItem * CNY_TO_KRW_RATE * item.quantity;
@@ -42,53 +39,33 @@ const Purchases: React.FC<PurchasesProps> = ({ purchases, products, onAddPurchas
     const additionalCosts = purchase.shippingCostKrw + purchase.customsFeeKrw + purchase.otherFeeKrw;
     const itemAdditionalCost = additionalCosts * itemRatio;
     return (itemBaseCostKrw + itemAdditionalCost) / item.quantity;
-  }
+  };
 
   const handleAddPurchase = (purchaseData: Omit<Purchase, 'id'>) => {
     onAddPurchase(purchaseData);
     setIsModalOpen(false);
-  }
+  };
 
   // 키보드 단축키
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Ctrl/Cmd + N: 새 매입 등록
       if ((event.ctrlKey || event.metaKey) && event.key === 'n') {
         event.preventDefault();
         setIsModalOpen(true);
       }
-      // Escape: 모달 닫기
-      if (event.key === 'Escape' && isModalOpen) {
+      if (event.key === 'Escape') {
         setIsModalOpen(false);
-      }
-      // Ctrl/Cmd + F: 검색 포커스
-      if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
-        event.preventDefault();
-        const searchInput = document.querySelector('input[placeholder*="검색"]') as HTMLInputElement;
-        if (searchInput) {
-          searchInput.focus();
-        }
+        setSelectedPurchase(null);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isModalOpen]);
-
-  const togglePurchaseExpansion = (purchaseId: string) => {
-    const newExpanded = new Set(expandedPurchases);
-    if (newExpanded.has(purchaseId)) {
-      newExpanded.delete(purchaseId);
-    } else {
-      newExpanded.add(purchaseId);
-    }
-    setExpandedPurchases(newExpanded);
-  }
+  }, []);
 
   // 필터링 및 정렬된 매입 목록
   const filteredAndSortedPurchases = useMemo(() => {
     let filtered = purchases.filter(purchase => {
-      // 검색어 필터
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         const hasMatchingProduct = purchase.items.some(item => {
@@ -99,18 +76,11 @@ const Purchases: React.FC<PurchasesProps> = ({ purchases, products, onAddPurchas
         });
         if (!hasMatchingProduct) return false;
       }
-
-      // 날짜 필터
-      if (dateFilter.start && purchase.date < dateFilter.start) return false;
-      if (dateFilter.end && purchase.date > dateFilter.end) return false;
-
       return true;
     });
 
-    // 정렬
     filtered.sort((a, b) => {
       let comparison = 0;
-
       switch (sortBy) {
         case 'date':
           comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -122,12 +92,11 @@ const Purchases: React.FC<PurchasesProps> = ({ purchases, products, onAddPurchas
           comparison = a.items.length - b.items.length;
           break;
       }
-
       return sortOrder === 'desc' ? -comparison : comparison;
     });
 
     return filtered;
-  }, [purchases, searchTerm, dateFilter, sortBy, sortOrder, products]);
+  }, [purchases, searchTerm, sortBy, sortOrder, products]);
 
   // 통계 계산
   const statistics = useMemo(() => {
@@ -139,299 +108,422 @@ const Purchases: React.FC<PurchasesProps> = ({ purchases, products, onAddPurchas
     return { totalPurchases, totalCost, totalItems, avgCostPerPurchase };
   }, [filteredAndSortedPurchases]);
 
+  const formatCurrency = (value: number) => `₩${Math.round(value).toLocaleString()}`;
+
   return (
-    <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">매입 관리</h1>
-          <p className="text-gray-600 mt-1">상품 매입 내역을 관리하고 원가를 분석하세요</p>
-          <div className="flex flex-wrap gap-2 mt-2 text-xs text-gray-500">
-            <span className="bg-gray-100 px-2 py-1 rounded">⌘+N 새 매입</span>
-            <span className="bg-gray-100 px-2 py-1 rounded">⌘+F 검색</span>
-            <span className="bg-gray-100 px-2 py-1 rounded">ESC 닫기</span>
-          </div>
-        </div>
-        <div className="flex flex-row gap-2 flex-wrap">
-          <button
-            onClick={() => setExpandedPurchases(new Set(filteredAndSortedPurchases.map(p => p.id)))}
-            className="inline-flex items-center justify-center bg-gray-100 text-gray-700 font-medium py-2 px-3 rounded-lg hover:bg-gray-200 transition duration-200 text-sm whitespace-nowrap"
-          >
-            모두 펼치기
-          </button>
-          <button
-            onClick={() => setExpandedPurchases(new Set())}
-            className="inline-flex items-center justify-center bg-gray-100 text-gray-700 font-medium py-2 px-3 rounded-lg hover:bg-gray-200 transition duration-200 text-sm whitespace-nowrap"
-          >
-            모두 접기
-          </button>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center justify-center bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200 text-sm whitespace-nowrap">
-            <PlusIcon className="w-4 h-4 mr-1.5" />
-            새 매입 등록
-          </button>
-        </div>
-      </div>
-
-      {/* 통계 대시보드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+    <div className="min-h-screen bg-slate-50 p-4">
+      <div className="max-w-7xl mx-auto space-y-6">
+        
+        {/* 모던한 헤더 */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-600 text-xs font-medium">총 매입 건수</p>
-              <p className="text-xl font-bold text-blue-800">{statistics.totalPurchases}</p>
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-lg">
+                📦
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900">매입 관리</h1>
+                <p className="text-slate-600 mt-1">스마트한 매입 관리와 원가 분석</p>
+              </div>
             </div>
-            <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center">
-              <span className="text-blue-600 text-sm">📦</span>
+            <div className="flex items-center space-x-3">
+              <div className="flex bg-slate-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'grid' 
+                      ? 'bg-white text-slate-900 shadow-sm' 
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  그리드
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'list' 
+                      ? 'bg-white text-slate-900 shadow-sm' 
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  리스트
+                </button>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                <PlusIcon className="w-4 h-4 mr-2" />
+                새 매입
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 통계 대시보드 */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-500 text-sm font-medium">총 매입 건수</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{statistics.totalPurchases}</p>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span className="text-blue-600 text-lg">📊</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-500 text-sm font-medium">총 매입 비용</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(statistics.totalCost)}</p>
+              </div>
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <span className="text-green-600 text-lg">💰</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-500 text-sm font-medium">총 상품 수량</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{statistics.totalItems}</p>
+              </div>
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <span className="text-purple-600 text-lg">📦</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-500 text-sm font-medium">평균 매입 비용</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(statistics.avgCostPerPurchase)}</p>
+              </div>
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <span className="text-orange-600 text-lg">📈</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-green-600 text-xs font-medium">총 매입 비용</p>
-              <p className="text-xl font-bold text-green-800">₩{statistics.totalCost.toLocaleString()}</p>
-            </div>
-            <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center">
-              <span className="text-green-600 text-sm">💰</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-purple-600 text-xs font-medium">총 상품 수량</p>
-              <p className="text-xl font-bold text-purple-800">{statistics.totalItems}</p>
-            </div>
-            <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center">
-              <span className="text-purple-600 text-sm">📊</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-orange-600 text-xs font-medium">평균 매입 비용</p>
-              <p className="text-xl font-bold text-orange-800">₩{Math.round(statistics.avgCostPerPurchase).toLocaleString()}</p>
-            </div>
-            <div className="w-8 h-8 bg-orange-200 rounded-full flex items-center justify-center">
-              <span className="text-orange-600 text-sm">📈</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 필터 및 검색 */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">검색</label>
-            <input
-              type="text"
-              placeholder="상품명, 옵션명, 매입 ID 검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">정렬 기준</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'date' | 'cost' | 'items')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="date">날짜순</option>
-              <option value="cost">비용순</option>
-              <option value="items">상품 수량순</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">정렬 순서</label>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="desc">내림차순</option>
-              <option value="asc">오름차순</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">기간 필터</label>
-            <div className="flex space-x-2">
+        {/* 검색 및 필터 */}
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex-1">
               <input
-                type="date"
-                value={dateFilter.start}
-                onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              />
-              <input
-                type="date"
-                value={dateFilter.end}
-                onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                type="text"
+                placeholder="상품명, 옵션명, 매입 ID로 검색..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
               />
             </div>
+            <div className="flex gap-3">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'date' | 'cost' | 'items')}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="date">날짜순</option>
+                <option value="cost">비용순</option>
+                <option value="items">상품수순</option>
+              </select>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="desc">내림차순</option>
+                <option value="asc">오름차순</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {(searchTerm || dateFilter.start || dateFilter.end) && (
-          <div className="mt-4 flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              {filteredAndSortedPurchases.length}개의 매입 내역이 검색되었습니다
-            </p>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setDateFilter({ start: '', end: '' });
-              }}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
-              필터 초기화
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* 매입 목록 */}
-      <div className="space-y-4">
+        {/* 매입 목록 */}
         {filteredAndSortedPurchases.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
-            <div className="text-6xl mb-4">📦</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">매입 내역이 없습니다</h3>
-            <p className="text-gray-500 mb-6">첫 번째 매입을 등록해보세요</p>
+          <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-slate-200">
+            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">📦</span>
+            </div>
+            <h3 className="text-xl font-semibold text-slate-900 mb-2">매입 내역이 없습니다</h3>
+            <p className="text-slate-600 mb-6">첫 번째 매입을 등록해보세요</p>
             <button
               onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center justify-center bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200 text-sm whitespace-nowrap">
-              <PlusIcon className="w-4 h-4 mr-1.5" />
+              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <PlusIcon className="w-4 h-4 mr-2" />
               매입 등록하기
             </button>
           </div>
-        ) : (
-          filteredAndSortedPurchases.map(purchase => {
-            const isExpanded = expandedPurchases.has(purchase.id);
-            const totalCost = calculateTotalPurchaseCost(purchase);
-            const totalQuantity = purchase.items.reduce((sum, item) => sum + item.quantity, 0);
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredAndSortedPurchases.map(purchase => {
+              const totalCost = calculateTotalPurchaseCost(purchase);
+              const totalQuantity = purchase.items.reduce((sum, item) => sum + item.quantity, 0);
+              const isSelected = selectedPurchase === purchase.id;
 
-            return (
-              <Card key={purchase.id}>
+              return (
                 <div
-                  className="cursor-pointer"
-                  onClick={() => togglePurchaseExpansion(purchase.id)}
+                  key={purchase.id}
+                  className={`bg-white rounded-xl shadow-sm border transition-all cursor-pointer ${
+                    isSelected 
+                      ? 'border-blue-500 ring-2 ring-blue-200' 
+                      : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+                  }`}
+                  onClick={() => setSelectedPurchase(isSelected ? null : purchase.id)}
                 >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-bold text-lg text-gray-800">매입 #{purchase.id}</h3>
-                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                          매입 #{purchase.id}
+                        </h3>
+                        <p className="text-sm text-slate-500">
+                          {new Date(purchase.date).toLocaleDateString('ko-KR')}
+                        </p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
                           {purchase.items.length}개 상품
                         </span>
-                        <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                          총 {totalQuantity}개
+                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                          {totalQuantity}개
                         </span>
                       </div>
-                      <p className="text-sm text-gray-500 mb-1">📅 {new Date(purchase.date).toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        weekday: 'short'
-                      })}</p>
-                      <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                    </div>
+
+                    <div className="mb-4">
+                      <div className="text-2xl font-bold text-slate-900 mb-1">
+                        {formatCurrency(totalCost)}
+                      </div>
+                      <div className="flex space-x-4 text-sm text-slate-600">
                         {purchase.shippingCostKrw > 0 && (
-                          <span className="bg-gray-100 px-2 py-1 rounded">배송비 ₩{purchase.shippingCostKrw.toLocaleString()}</span>
+                          <span>배송비 {formatCurrency(purchase.shippingCostKrw)}</span>
                         )}
                         {purchase.customsFeeKrw > 0 && (
-                          <span className="bg-gray-100 px-2 py-1 rounded">관세 ₩{purchase.customsFeeKrw.toLocaleString()}</span>
-                        )}
-                        {purchase.otherFeeKrw > 0 && (
-                          <span className="bg-gray-100 px-2 py-1 rounded">기타 ₩{purchase.otherFeeKrw.toLocaleString()}</span>
+                          <span>관세 {formatCurrency(purchase.customsFeeKrw)}</span>
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-xl text-gray-800 mb-1">
-                        ₩{totalCost.toLocaleString()}
-                      </p>
-                      <p className="text-sm text-gray-500">총 매입 비용</p>
-                      <div className="mt-2">
-                        <span className={`inline-block w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
-                          ▼
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                {isExpanded && (
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <h4 className="font-semibold text-gray-800 mb-4">상품 상세 내역</h4>
-                    <div className="space-y-4">
-                      {purchase.items.map(item => {
+                    {/* 상품 미리보기 */}
+                    <div className="space-y-2">
+                      {purchase.items.slice(0, 2).map(item => {
                         const { productName, optionName } = getProductInfo(item.productId, item.optionId);
-                        const actualCost = calculateActualCostPerItem(purchase, item);
-                        const baseCostKrw = item.costCnyPerItem * CNY_TO_KRW_RATE;
-                        const totalItemCost = actualCost * item.quantity;
-
                         return (
-                          <div key={`${purchase.id}-${item.optionId}`} className="bg-gray-50 p-4 rounded-lg">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <h5 className="font-medium text-gray-800 mb-1">
-                                  {productName || '삭제된 상품'}
-                                </h5>
-                                <p className="text-sm text-gray-600 mb-2">
-                                  {optionName || '삭제된 옵션'}
-                                </p>
-                                <div className="flex items-center gap-4 text-sm">
-                                  <span className="bg-white px-3 py-1 rounded border">
-                                    수량: {item.quantity}개
-                                  </span>
-                                  <span className="bg-white px-3 py-1 rounded border">
-                                    원화 환율: ¥{item.costCnyPerItem.toFixed(2)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="space-y-1">
-                                  <p className="text-sm text-gray-600">
-                                    기본 원가: ₩{Math.round(baseCostKrw).toLocaleString()}
-                                  </p>
-                                  <p className="text-sm font-semibold text-blue-600">
-                                    실제 개당 원가: ₩{Math.round(actualCost).toLocaleString()}
-                                  </p>
-                                  <p className="text-lg font-bold text-gray-800">
-                                    소계: ₩{Math.round(totalItemCost).toLocaleString()}
-                                  </p>
-                                </div>
-                              </div>
+                          <div key={`${purchase.id}-${item.optionId}`} className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">
+                                {productName || '삭제된 상품'}
+                              </p>
+                              <p className="text-xs text-slate-600">
+                                {optionName || '삭제된 옵션'} • {item.quantity}개
+                              </p>
+                            </div>
+                            <div className="text-sm font-medium text-slate-900">
+                              ¥{item.costCnyPerItem.toFixed(2)}
                             </div>
                           </div>
                         );
                       })}
+                      {purchase.items.length > 2 && (
+                        <div className="text-center py-2 text-sm text-slate-500">
+                          +{purchase.items.length - 2}개 더보기
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
-              </Card>
-            );
-          })
-        )}
-      </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="새 매입 등록">
-        <PurchaseForm
-          products={products}
-          onAddPurchase={handleAddPurchase}
-          onCancel={() => setIsModalOpen(false)}
-        />
-      </Modal>
+                  {/* 상세 정보 (확장 시) */}
+                  {isSelected && (
+                    <div className="border-t border-slate-200 p-6 bg-slate-50">
+                      <h4 className="font-semibold text-slate-900 mb-4">상세 내역</h4>
+                      <div className="space-y-3">
+                        {purchase.items.map(item => {
+                          const { productName, optionName } = getProductInfo(item.productId, item.optionId);
+                          const actualCost = calculateActualCostPerItem(purchase, item);
+                          const baseCostKrw = item.costCnyPerItem * CNY_TO_KRW_RATE;
+                          const totalItemCost = actualCost * item.quantity;
+
+                          return (
+                            <div key={`${purchase.id}-${item.optionId}`} className="bg-white p-4 rounded-lg">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h5 className="font-medium text-slate-900 mb-1">
+                                    {productName || '삭제된 상품'}
+                                  </h5>
+                                  <p className="text-sm text-slate-600 mb-2">
+                                    {optionName || '삭제된 옵션'}
+                                  </p>
+                                  <div className="flex space-x-3 text-xs text-slate-500">
+                                    <span>수량: {item.quantity}개</span>
+                                    <span>단가: ¥{item.costCnyPerItem.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm text-slate-600">
+                                    기본: {formatCurrency(baseCostKrw)}
+                                  </p>
+                                  <p className="text-sm font-semibold text-blue-600">
+                                    실제: {formatCurrency(actualCost)}
+                                  </p>
+                                  <p className="text-lg font-bold text-slate-900">
+                                    {formatCurrency(totalItemCost)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredAndSortedPurchases.map(purchase => {
+              const totalCost = calculateTotalPurchaseCost(purchase);
+              const totalQuantity = purchase.items.reduce((sum, item) => sum + item.quantity, 0);
+              const isSelected = selectedPurchase === purchase.id;
+
+              return (
+                <div
+                  key={purchase.id}
+                  className={`bg-white rounded-xl shadow-sm border transition-all cursor-pointer ${
+                    isSelected 
+                      ? 'border-blue-500 ring-2 ring-blue-200' 
+                      : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+                  }`}
+                  onClick={() => setSelectedPurchase(isSelected ? null : purchase.id)}
+                >
+                  <div className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">
+                            매입 #{purchase.id}
+                          </h3>
+                          <p className="text-sm text-slate-500">
+                            {new Date(purchase.date).toLocaleDateString('ko-KR')}
+                          </p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                            {purchase.items.length}개 상품
+                          </span>
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                            {totalQuantity}개
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-slate-900">
+                          {formatCurrency(totalCost)}
+                        </div>
+                        <div className="flex space-x-4 text-sm text-slate-600">
+                          {purchase.shippingCostKrw > 0 && (
+                            <span>배송비 {formatCurrency(purchase.shippingCostKrw)}</span>
+                          )}
+                          {purchase.customsFeeKrw > 0 && (
+                            <span>관세 {formatCurrency(purchase.customsFeeKrw)}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 리스트 뷰에서는 상품 미리보기를 가로로 표시 */}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {purchase.items.slice(0, 3).map(item => {
+                        const { productName, optionName } = getProductInfo(item.productId, item.optionId);
+                        return (
+                          <div key={`${purchase.id}-${item.optionId}`} className="flex items-center space-x-2 bg-slate-50 px-3 py-2 rounded-lg">
+                            <span className="text-sm font-medium text-slate-900">
+                              {productName || '삭제된 상품'}
+                            </span>
+                            <span className="text-xs text-slate-600">
+                              {optionName || '삭제된 옵션'} • {item.quantity}개
+                            </span>
+                            <span className="text-sm font-medium text-slate-900">
+                              ¥{item.costCnyPerItem.toFixed(2)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {purchase.items.length > 3 && (
+                        <div className="flex items-center px-3 py-2 text-sm text-slate-500">
+                          +{purchase.items.length - 3}개 더
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 상세 정보 (확장 시) */}
+                  {isSelected && (
+                    <div className="border-t border-slate-200 p-6 bg-slate-50">
+                      <h4 className="font-semibold text-slate-900 mb-4">상세 내역</h4>
+                      <div className="space-y-3">
+                        {purchase.items.map(item => {
+                          const { productName, optionName } = getProductInfo(item.productId, item.optionId);
+                          const actualCost = calculateActualCostPerItem(purchase, item);
+                          const baseCostKrw = item.costCnyPerItem * CNY_TO_KRW_RATE;
+                          const totalItemCost = actualCost * item.quantity;
+
+                          return (
+                            <div key={`${purchase.id}-${item.optionId}`} className="bg-white p-4 rounded-lg">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h5 className="font-medium text-slate-900 mb-1">
+                                    {productName || '삭제된 상품'}
+                                  </h5>
+                                  <p className="text-sm text-slate-600 mb-2">
+                                    {optionName || '삭제된 옵션'}
+                                  </p>
+                                  <div className="flex space-x-3 text-xs text-slate-500">
+                                    <span>수량: {item.quantity}개</span>
+                                    <span>단가: ¥{item.costCnyPerItem.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm text-slate-600">
+                                    기본: {formatCurrency(baseCostKrw)}
+                                  </p>
+                                  <p className="text-sm font-semibold text-blue-600">
+                                    실제: {formatCurrency(actualCost)}
+                                  </p>
+                                  <p className="text-lg font-bold text-slate-900">
+                                    {formatCurrency(totalItemCost)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="새 매입 등록">
+          <PurchaseForm
+            products={products}
+            onAddPurchase={handleAddPurchase}
+            onCancel={() => setIsModalOpen(false)}
+          />
+        </Modal>
+      </div>
     </div>
   );
 };

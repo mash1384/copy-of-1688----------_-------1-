@@ -172,7 +172,7 @@ const MarginCalculator: React.FC<MarginCalculatorProps> = ({ products, onUpdateP
 
   return (
     <div className="h-screen bg-slate-50 p-4 overflow-hidden">
-      <style jsx>{`
+      <style>{`
         .slider-blue {
           -webkit-appearance: none;
           appearance: none;

@@ -96,7 +96,7 @@ const PurchaseForm: React.FC<PurchaseFormProps> = ({ products, onAddPurchase, on
   };
 
   return (
-    <div className="max-h-[80vh] overflow-y-auto">
+    <div className="p-6">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 헤더 정보 */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
