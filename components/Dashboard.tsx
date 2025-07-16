@@ -173,9 +173,7 @@ const Dashboard: React.FC<DashboardProps> = ({ products, sales, purchases }) => 
   const formatNumber = (value: number) => `${value.toLocaleString()}`;
 
   return (
-    <div className="space-y-3">
-      <h1 className="text-2xl font-bold text-gray-800">대시보드</h1>
-
+    <div>
       {/* 벤토 그리드 레이아웃 */}
       <div className="grid grid-cols-12 gap-3 auto-rows-min">
         
@@ -212,60 +210,111 @@ const Dashboard: React.FC<DashboardProps> = ({ products, sales, purchases }) => 
           <p className="text-lg font-bold text-gray-800 mt-1">{formatNumber(totalPurchaseCount)}</p>
         </Card>
 
-        {/* 월별 데이터 - 넓은 카드 */}
-        <Card className="col-span-7 p-3">
-          <h3 className="text-sm font-semibold text-gray-800 mb-2">월별 매출 vs 매입</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-1 px-2 font-semibold text-gray-700">월</th>
-                  <th className="text-right py-1 px-2 font-semibold text-gray-700">매출</th>
-                  <th className="text-right py-1 px-2 font-semibold text-gray-700">매입비용</th>
-                  <th className="text-right py-1 px-2 font-semibold text-gray-700">순이익</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthlyData.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="text-center py-4 text-gray-500 text-xs">
-                      데이터가 없습니다
-                    </td>
-                  </tr>
-                ) : (
-                  monthlyData.slice(-6).map((data, index) => (
-                    <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-1 px-2">{data.date}</td>
-                      <td className="py-1 px-2 text-right font-medium text-green-600">
-                        {formatCurrency(data.매출)}
-                      </td>
-                      <td className="py-1 px-2 text-right font-medium text-orange-600">
-                        {formatCurrency(data.매입비용)}
-                      </td>
-                      <td className={`py-1 px-2 text-right font-medium ${data.순이익 > 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                        {formatCurrency(data.순이익)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        {/* 재무 현황 시각화 - 간단한 바 차트 */}
+        <Card className="col-span-7 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-gray-800">재무 현황</h3>
+          </div>
+          
+          <div className="space-y-4">
+            {/* 간단한 바 차트 */}
+            <div className="space-y-4">
+              {(() => {
+                const maxValue = Math.max(totalRevenue, totalPurchaseCost, Math.abs(totalProfit));
+                const revenuePercent = maxValue > 0 ? (totalRevenue / maxValue) * 100 : 0;
+                const costPercent = maxValue > 0 ? (totalPurchaseCost / maxValue) * 100 : 0;
+                const profitPercent = maxValue > 0 ? (Math.abs(totalProfit) / maxValue) * 100 : 0;
+                const isProfitPositive = totalProfit >= 0;
+                
+                return (
+                  <>
+                    {/* 총 매출 */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">총 매출</span>
+                        <span className="text-lg font-bold text-emerald-600">{formatCurrency(totalRevenue)}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-lg h-3">
+                        <div 
+                          className="h-full bg-emerald-500 rounded-lg"
+                          style={{ width: `${revenuePercent}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    
+                    {/* 총 매입비용 */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">총 매입비용</span>
+                        <span className="text-lg font-bold text-orange-600">{formatCurrency(totalPurchaseCost)}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-lg h-3">
+                        <div 
+                          className="h-full bg-orange-500 rounded-lg"
+                          style={{ width: `${costPercent}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    
+                    {/* 총 순이익 */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">총 순이익</span>
+                        <span className={`text-lg font-bold ${isProfitPositive ? 'text-blue-600' : 'text-red-600'}`}>
+                          {formatCurrency(totalProfit)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-lg h-3">
+                        <div 
+                          className={`h-full rounded-lg ${isProfitPositive ? 'bg-blue-500' : 'bg-red-500'}`}
+                          style={{ width: `${profitPercent}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            
+            {/* 간단한 통계 */}
+            <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-200">
+              <div className="text-center p-3 bg-emerald-50 rounded-lg">
+                <div className="text-xs text-emerald-600 font-medium mb-1">순이익률</div>
+                <div className={`text-lg font-bold ${totalProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0}%
+                </div>
+              </div>
+              
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <div className="text-xs text-blue-600 font-medium mb-1">매입 비율</div>
+                <div className="text-lg font-bold text-blue-700">
+                  {totalRevenue > 0 ? ((totalPurchaseCost / totalRevenue) * 100).toFixed(1) : 0}%
+                </div>
+              </div>
+              
+              <div className="text-center p-3 bg-gray-50 rounded-lg">
+                <div className="text-xs text-gray-600 font-medium mb-1">수익성</div>
+                <div className={`text-sm font-bold ${totalProfit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  {totalProfit >= 0 ? '수익' : '손실'}
+                </div>
+              </div>
+            </div>
           </div>
         </Card>
 
         {/* 최근 활동 - 세로 긴 카드 */}
         <Card className="col-span-5 p-3">
-          <h3 className="text-sm font-semibold text-gray-800 mb-2">최근 활동</h3>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">최근 활동</h3>
+          <div className="space-y-2 max-h-80 overflow-y-auto">
             {recentActivity.length === 0 ? (
-              <div className="text-center py-4 text-gray-500 text-sm">
+              <div className="text-center py-8 text-gray-500 text-sm">
                 <p>최근 활동이 없습니다</p>
               </div>
             ) : (
-              recentActivity.slice(0, 8).map((activity, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${activity.type === '매출'
+              recentActivity.slice(0, 12).map((activity, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg text-xs hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${activity.type === '매출'
                       ? 'bg-green-100 text-green-600'
                       : 'bg-orange-100 text-orange-600'
                       }`}>
@@ -317,94 +366,209 @@ const Dashboard: React.FC<DashboardProps> = ({ products, sales, purchases }) => 
           </div>
         </Card>
 
-        {/* 채널별 매출 */}
+        {/* 채널별 매출 - 원형 시각화 그래프 */}
         <Card className="col-span-4 p-3">
-          <h3 className="text-sm font-semibold text-gray-800 mb-2">채널별 매출</h3>
-          <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">채널별 매출</h3>
+          <div className="space-y-3">
             {channelData.length === 0 ? (
-              <div className="text-center py-4 text-gray-500 text-sm">
+              <div className="text-center py-8 text-gray-500 text-sm">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <span className="text-2xl">📊</span>
+                </div>
                 <p>매출 데이터가 없습니다</p>
               </div>
             ) : (
-              channelData.map((channel, index) => {
-                const percentage = totalRevenue > 0 ? (channel.value / totalRevenue * 100) : 0;
-                return (
-                  <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
-                    <div className="flex items-center">
-                      <div
-                        className="w-3 h-3 rounded-full mr-2"
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                      ></div>
-                      <span className="font-medium text-gray-800 text-xs">{channel.name}</span>
+              <>
+                {/* 파이차트와 총매출 분리 레이아웃 */}
+                <div className="space-y-4">
+                  {/* 총 매출 표시 */}
+                  <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+                    <div className="text-sm text-gray-600 font-medium mb-1">총 매출</div>
+                    <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      {formatCurrency(totalRevenue)}
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-gray-800 text-xs">{formatCurrency(channel.value)}</div>
-                      <div className="text-xs text-gray-500">{percentage.toFixed(1)}%</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {channelData.length}개 채널
                     </div>
                   </div>
-                );
-              })
+
+                  {/* 고급 인터랙티브 파이차트 */}
+                  <div className="flex items-center justify-center relative">
+                    <div className="relative w-48 h-48 group">
+                      {/* 배경 그림자 */}
+                      <div className="absolute inset-2 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full opacity-30 blur-sm"></div>
+                      
+                      <svg className="w-48 h-48 drop-shadow-lg" viewBox="0 0 200 200">
+                        {/* 그라데이션 정의 */}
+                        <defs>
+                          {channelData.map((_, index) => (
+                            <radialGradient key={`gradient-${index}`} id={`gradient-${index}`} cx="50%" cy="50%" r="50%">
+                              <stop offset="0%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.9" />
+                              <stop offset="100%" stopColor={COLORS[index % COLORS.length]} stopOpacity="0.7" />
+                            </radialGradient>
+                          ))}
+                          
+                          {/* 글로우 효과 */}
+                          <filter id="glow">
+                            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                            <feMerge> 
+                              <feMergeNode in="coloredBlur"/>
+                              <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                          </filter>
+                          
+                          {/* 드롭 섀도우 */}
+                          <filter id="dropshadow">
+                            <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3"/>
+                          </filter>
+                        </defs>
+                        
+                        {(() => {
+                          let cumulativeAngle = 0;
+                          const centerX = 100;
+                          const centerY = 100;
+                          const radius = 80;
+                          
+                          // 파이 조각을 그리는 함수
+                          const createPieSlice = (startAngle: number, endAngle: number) => {
+                            const x1 = centerX + radius * Math.cos((startAngle * Math.PI) / 180);
+                            const y1 = centerY + radius * Math.sin((startAngle * Math.PI) / 180);
+                            const x2 = centerX + radius * Math.cos((endAngle * Math.PI) / 180);
+                            const y2 = centerY + radius * Math.sin((endAngle * Math.PI) / 180);
+                            
+                            const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+                            
+                            return `M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+                          };
+                          
+                          return channelData
+                            .sort((a, b) => b.value - a.value)
+                            .map((channel, index) => {
+                              const percentage = totalRevenue > 0 ? (channel.value / totalRevenue * 100) : 0;
+                              const angle = (percentage / 100) * 360;
+                              const startAngle = cumulativeAngle;
+                              const endAngle = cumulativeAngle + angle;
+                              cumulativeAngle += angle;
+                              
+                              const pathData = createPieSlice(startAngle, endAngle);
+                              
+                              return (
+                                <g key={index}>
+                                  {/* 파이 조각 - 로딩 애니메이션 추가 */}
+                                  <path
+                                    d={pathData}
+                                    fill={`url(#gradient-${index})`}
+                                    stroke="white"
+                                    strokeWidth="2"
+                                    className="transition-all duration-500 ease-out hover:scale-105 cursor-pointer"
+                                    filter="url(#dropshadow)"
+                                    style={{ 
+                                      transformOrigin: '100px 100px',
+                                      animation: `pieSlideIn 0.8s ease-out ${index * 0.15}s forwards`,
+                                      opacity: 0,
+                                      transform: 'scale(0) rotate(-90deg)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      // 호버 시 조각을 약간 밖으로 이동
+                                      const element = e.currentTarget;
+                                      const midAngle = (startAngle + endAngle) / 2;
+                                      const offsetX = 10 * Math.cos((midAngle * Math.PI) / 180);
+                                      const offsetY = 10 * Math.sin((midAngle * Math.PI) / 180);
+                                      element.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(1.05)`;
+                                      
+                                      // 툴팁 표시
+                                      const tooltip = document.getElementById('chart-tooltip');
+                                      if (tooltip) {
+                                        tooltip.style.display = 'block';
+                                        tooltip.innerHTML = `
+                                          <div class="bg-white p-4 rounded-xl shadow-2xl border border-gray-200 backdrop-blur-sm max-w-xs">
+                                            <div class="flex items-center space-x-3 mb-2">
+                                              <div class="w-4 h-4 rounded-full shadow-sm" style="background-color: ${COLORS[index % COLORS.length]}"></div>
+                                              <span class="font-bold text-gray-800 text-lg">${channel.name}</span>
+                                            </div>
+                                            <div class="text-2xl font-bold text-gray-900 mb-1">${formatCurrency(channel.value)}</div>
+                                            <div class="text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded-full inline-block">
+                                              전체의 ${percentage.toFixed(1)}%
+                                            </div>
+                                          </div>
+                                        `;
+                                      }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      // 원래 위치로 복귀
+                                      const element = e.currentTarget;
+                                      element.style.transform = 'translate(0px, 0px) scale(1)';
+                                      
+                                      // 툴팁 숨기기
+                                      const tooltip = document.getElementById('chart-tooltip');
+                                      if (tooltip) {
+                                        tooltip.style.display = 'none';
+                                      }
+                                    }}
+                                  />
+                                  
+                                  {/* 호버 시 외곽 글로우 */}
+                                  <path
+                                    d={pathData}
+                                    fill="none"
+                                    stroke={COLORS[index % COLORS.length]}
+                                    strokeWidth="4"
+                                    className="opacity-0 hover:opacity-40 transition-opacity duration-300 pointer-events-none"
+                                    filter="url(#glow)"
+                                  />
+                                </g>
+                              );
+                            });
+                        })()}
+                      </svg>
+                    </div>
+                    
+                    {/* 툴팁 컨테이너 */}
+                    <div 
+                      id="chart-tooltip" 
+                      className="absolute z-50 pointer-events-none"
+                      style={{ display: 'none', top: '-10px', left: '100%', marginLeft: '10px' }}
+                    ></div>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </Card>
 
-        {/* 매입 분석 - 넓은 카드 */}
+        {/* 최근 매입 현황 - 채널별 매출 옆에 위치 */}
         {purchaseData.length > 0 && (
-          <Card className="col-span-12 p-3">
-            <h3 className="text-sm font-semibold text-gray-800 mb-2">최근 매입 현황</h3>
-            <div className="grid grid-cols-3 gap-3 mb-3">
-              <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-2 rounded border border-orange-200">
-                <h4 className="text-orange-600 font-medium text-xs">평균 매입 비용</h4>
-                <p className="text-sm font-bold text-orange-800 mt-1">
-                  {formatCurrency(totalPurchaseCost / totalPurchaseCount)}
-                </p>
-              </div>
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-2 rounded border border-blue-200">
-                <h4 className="text-blue-600 font-medium text-xs">평균 매입 수량</h4>
-                <p className="text-sm font-bold text-blue-800 mt-1">
-                  {Math.round(purchaseData.reduce((sum, p) => sum + p.quantity, 0) / purchaseData.length)}개
-                </p>
-              </div>
-              <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-2 rounded border border-purple-200">
-                <h4 className="text-purple-600 font-medium text-xs">평균 상품 종류</h4>
-                <p className="text-sm font-bold text-purple-800 mt-1">
-                  {Math.round(purchaseData.reduce((sum, p) => sum + p.items, 0) / purchaseData.length)}종
-                </p>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-1 px-2 font-semibold text-gray-700">날짜</th>
-                    <th className="text-right py-1 px-2 font-semibold text-gray-700">매입 비용</th>
-                    <th className="text-right py-1 px-2 font-semibold text-gray-700">수량</th>
-                    <th className="text-right py-1 px-2 font-semibold text-gray-700">상품 종류</th>
-                    <th className="text-right py-1 px-2 font-semibold text-gray-700">개당 평균 원가</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {purchaseData.slice(0, 5).map((purchase, index) => (
-                    <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-1 px-2">
+          <Card className="col-span-4 p-3">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">최근 매입 현황</h3>
+            <div className="space-y-2">
+              {purchaseData.slice(0, 6).map((purchase, index) => (
+                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-xs hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center font-bold">
+                      📦
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-800">
                         {new Date(purchase.date).toLocaleDateString('ko-KR', {
                           month: 'short',
                           day: 'numeric'
                         })}
-                      </td>
-                      <td className="py-1 px-2 text-right font-medium text-orange-600">
-                        {formatCurrency(purchase.cost)}
-                      </td>
-                      <td className="py-1 px-2 text-right">{purchase.quantity}개</td>
-                      <td className="py-1 px-2 text-right">{purchase.items}종</td>
-                      <td className="py-1 px-2 text-right font-medium">
-                        {formatCurrency(purchase.cost / purchase.quantity)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                      <div className="text-gray-500">
+                        {purchase.items}종 · {purchase.quantity}개
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-orange-600">
+                      {formatCurrency(purchase.cost)}
+                    </div>
+                    <div className="text-gray-500">
+                      개당 {formatCurrency(purchase.cost / purchase.quantity)}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
         )}
