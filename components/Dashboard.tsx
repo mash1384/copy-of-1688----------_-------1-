@@ -417,21 +417,21 @@ const Dashboard: React.FC<DashboardProps> = ({ products, sales, purchases }) => 
                     const maxRevenue = revenueValues.length > 0 ? Math.max(...revenueValues) : 1;
                     const maxProfit = profitValues.length > 0 ? Math.max(...profitValues) : 1;
 
-                    // 개월 수에 따른 반응형 차트 크기 조절 (카드 섹션 내 완전 수용)
+                    // 개월 수에 따른 반응형 차트 크기 조절
                     const getResponsiveStyles = (monthCount: number) => {
                       switch (monthCount) {
                         case 1:
                           return { barWidth: 'w-16', spacing: 'space-x-0', fontSize: 'text-sm' };
                         case 2:
-                          return { barWidth: 'w-12', spacing: 'space-x-4', fontSize: 'text-sm' };
+                          return { barWidth: 'w-14', spacing: 'space-x-6', fontSize: 'text-sm' };
                         case 3:
-                          return { barWidth: 'w-10', spacing: 'space-x-3', fontSize: 'text-xs' };
+                          return { barWidth: 'w-12', spacing: 'space-x-4', fontSize: 'text-xs' };
                         case 4:
-                          return { barWidth: 'w-7', spacing: 'space-x-1', fontSize: 'text-xs' };
+                          return { barWidth: 'w-10', spacing: 'space-x-3', fontSize: 'text-xs' };
                         case 5:
-                          return { barWidth: 'w-5', spacing: 'space-x-1', fontSize: 'text-xs' };
+                          return { barWidth: 'w-8', spacing: 'space-x-2', fontSize: 'text-xs' };
                         default:
-                          return { barWidth: 'w-5', spacing: 'space-x-1', fontSize: 'text-xs' };
+                          return { barWidth: 'w-8', spacing: 'space-x-2', fontSize: 'text-xs' };
                       }
                     };
 
