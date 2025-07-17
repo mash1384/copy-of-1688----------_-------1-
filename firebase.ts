@@ -1,5 +1,20 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+  User,
+  updateProfile
+} from 'firebase/auth';
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp
+} from 'firebase/firestore';
 
 // Firebase 설정
 const firebaseConfig = {
@@ -15,6 +30,7 @@ const firebaseConfig = {
 // Firebase 초기화
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 
 // Google 로그인 프로바이더
 const googleProvider = new GoogleAuthProvider();
@@ -40,6 +56,57 @@ export const signOutUser = async () => {
   } catch (error) {
     console.error('로그아웃 오류:', error);
     throw error;
+  }
+};
+
+
+
+// 사용자 데이터 타입 정의
+export interface UserData {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string;
+  provider: string;
+  createdAt: any;
+  lastLoginAt: any;
+}
+
+// 사용자 데이터 생성/업데이트 (소셜 로그인 시 자동 처리)
+export const createOrUpdateUser = async (user: User) => {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const isNewUser = !userDoc.exists();
+
+    const userData: UserData = {
+      uid: user.uid,
+      email: user.email || '',
+      displayName: user.displayName || '',
+      photoURL: user.photoURL || '',
+      provider: user.providerData[0]?.providerId || 'google.com',
+      createdAt: isNewUser ? serverTimestamp() : userDoc.data()?.createdAt,
+      lastLoginAt: serverTimestamp(),
+    };
+
+    await setDoc(doc(db, 'users', user.uid), userData, { merge: true });
+    return isNewUser;
+  } catch (error) {
+    console.error('사용자 데이터 저장 오류:', error);
+    throw error;
+  }
+};
+
+// 사용자 데이터 조회
+export const getUserData = async (uid: string): Promise<UserData | null> => {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    if (userDoc.exists()) {
+      return userDoc.data() as UserData;
+    }
+    return null;
+  } catch (error) {
+    console.error('사용자 데이터 조회 오류:', error);
+    return null;
   }
 };
 

@@ -6,15 +6,18 @@ import { Product, Purchase, Sale, AppSettings, ProductOption } from './types';
 import { INITIAL_PRODUCTS, INITIAL_PURCHASES, INITIAL_SALES, INITIAL_SETTINGS, EMPTY_PRODUCTS, EMPTY_PURCHASES, EMPTY_SALES, CNY_TO_KRW_RATE } from './constants';
 import { DashboardIcon, ProductIcon, PurchaseIcon, SaleIcon, InventoryIcon, CalculatorIcon, SettingsIcon, LogoutIcon, RooIcon } from './components/icons/Icons';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Dashboard from './components/Dashboard';
-import Products from './components/Products';
-import Purchases from './components/Purchases';
-import Sales from './components/Sales';
-import Inventory from './components/Inventory';
-import MarginCalculator from './components/MarginCalculator';
-import Settings from './components/Settings';
+import { lazy, Suspense } from 'react';
 import Login from './components/Login';
 import UserProfile from './components/UserProfile';
+
+// 지연 로딩으로 성능 개선
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Products = lazy(() => import('./components/Products'));
+const Purchases = lazy(() => import('./components/Purchases'));
+const Sales = lazy(() => import('./components/Sales'));
+const Inventory = lazy(() => import('./components/Inventory'));
+const MarginCalculator = lazy(() => import('./components/MarginCalculator'));
+const Settings = lazy(() => import('./components/Settings'));
 
 type View = 'dashboard' | 'products' | 'purchases' | 'sales' | 'inventory' | 'calculator' | 'settings';
 
@@ -192,30 +195,46 @@ const MainApp: React.FC = () => {
   ]
 
   const renderContent = () => {
-    switch (activeView) {
-      case 'dashboard':
-        return <Dashboard products={products} sales={sales} purchases={purchases} />;
-      case 'products':
-        return <Products products={products} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} />;
-      case 'purchases':
-        return <Purchases purchases={purchases} products={products} onAddPurchase={handleAddPurchase} />;
-      case 'sales':
-        return <Sales sales={sales} products={products} settings={settings} onAddSale={handleAddSale} />;
-      case 'inventory':
-        return <Inventory products={products} />;
-      case 'calculator':
-        return <MarginCalculator products={products} onUpdateProductOption={handleUpdateProductOption} />;
-      case 'settings':
-        return <Settings
-          settings={settings}
-          onUpdateSettings={handleUpdateSettings}
-          onResetAllData={handleResetAllData}
-          onCompleteReset={handleCompleteReset}
-          onLoadSampleData={handleLoadSampleData}
-        />;
-      default:
-        return <Dashboard products={products} sales={sales} purchases={purchases} />;
-    }
+    const LoadingSpinner = () => (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center space-x-2">
+          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+        </div>
+      </div>
+    );
+
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        {(() => {
+          switch (activeView) {
+            case 'dashboard':
+              return <Dashboard products={products} sales={sales} purchases={purchases} />;
+            case 'products':
+              return <Products products={products} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} />;
+            case 'purchases':
+              return <Purchases purchases={purchases} products={products} onAddPurchase={handleAddPurchase} />;
+            case 'sales':
+              return <Sales sales={sales} products={products} settings={settings} onAddSale={handleAddSale} />;
+            case 'inventory':
+              return <Inventory products={products} />;
+            case 'calculator':
+              return <MarginCalculator products={products} onUpdateProductOption={handleUpdateProductOption} />;
+            case 'settings':
+              return <Settings
+                settings={settings}
+                onUpdateSettings={handleUpdateSettings}
+                onResetAllData={handleResetAllData}
+                onCompleteReset={handleCompleteReset}
+                onLoadSampleData={handleLoadSampleData}
+              />;
+            default:
+              return <Dashboard products={products} sales={sales} purchases={purchases} />;
+          }
+        })()}
+      </Suspense>
+    );
   };
 
   return (
@@ -274,10 +293,18 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">로딩 중...</p>
+          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span className="text-white text-2xl font-bold">S</span>
+          </div>
+          <h1 className="text-2xl font-bold text-blue-600 mb-4">Seller Roo</h1>
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+          </div>
+          <p className="text-gray-600">시스템을 준비하고 있습니다...</p>
         </div>
       </div>
     );

@@ -1,7 +1,14 @@
 import * as React from 'react';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
-import { onAuthStateChangedListener, signInWithGoogle, signOutUser } from '../firebase';
+import { 
+  onAuthStateChangedListener, 
+  signInWithGoogle, 
+  signOutUser,
+  createOrUpdateUser,
+  getUserData,
+  UserData
+} from '../firebase';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -39,6 +46,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const handleSignInWithGoogle = async () => {
     const user = await signInWithGoogle();
+    // 소셜 로그인 시 자동으로 사용자 데이터 생성/업데이트
+    await createOrUpdateUser(user);
     return user;
   };
 
