@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import { Product, Purchase, Sale, AppSettings, ProductOption } from './types';
 import { INITIAL_PRODUCTS, INITIAL_PURCHASES, INITIAL_SALES, INITIAL_SETTINGS, EMPTY_PRODUCTS, EMPTY_PURCHASES, EMPTY_SALES, CNY_TO_KRW_RATE } from './constants';
-import { DashboardIcon, ProductIcon, PurchaseIcon, SaleIcon, InventoryIcon, CalculatorIcon, SettingsIcon, LogoutIcon } from './components/icons/Icons';
+import { DashboardIcon, ProductIcon, PurchaseIcon, SaleIcon, InventoryIcon, CalculatorIcon, SettingsIcon, LogoutIcon, RooIcon } from './components/icons/Icons';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Dashboard from './components/Dashboard';
 import Products from './components/Products';
@@ -223,7 +223,7 @@ const MainApp: React.FC = () => {
       {/* Sidebar */}
       <aside className="w-64 bg-white flex flex-col shadow-lg">
         <div className="flex items-center justify-center h-20 border-b">
-          <h1 className="text-2xl font-bold text-blue-600">BizManager</h1>
+          <h1 className="text-2xl font-bold text-blue-600">Seller Roo</h1>
         </div>
         <nav className="flex-1 px-4 py-6 space-y-2">
           {navItems.map(item => (

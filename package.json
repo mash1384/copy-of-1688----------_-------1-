@@ -1,9 +1,9 @@
 {
-  "name": "bizmanager-app",
+  "name": "seller-roo-app",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "1688 의류 사업자 재고/매출 관리 시스템",
+  "description": "Seller Roo - 스마트 판매 관리 시스템",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
