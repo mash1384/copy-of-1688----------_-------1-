@@ -1,10 +1,24 @@
 
 
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Product, Purchase, Sale, AppSettings, ProductOption } from './types';
-import { INITIAL_PRODUCTS, INITIAL_PURCHASES, INITIAL_SALES, INITIAL_SETTINGS, EMPTY_PRODUCTS, EMPTY_PURCHASES, EMPTY_SALES, CNY_TO_KRW_RATE } from './constants';
-import { DashboardIcon, ProductIcon, PurchaseIcon, SaleIcon, InventoryIcon, CalculatorIcon, SettingsIcon, LogoutIcon, RooIcon } from './components/icons/Icons';
+import { 
+  getProducts, 
+  addProduct, 
+  updateProduct, 
+  deleteProduct,
+  getSales,
+  addSale,
+  getPurchases,
+  addPurchase,
+  getSettings,
+  updateSettings,
+  updateProductOption,
+  createSampleData,
+  deleteAllData
+} from './lib/database';
+import { DashboardIcon, ProductIcon, PurchaseIcon, SaleIcon, InventoryIcon, CalculatorIcon, SettingsIcon } from './components/icons/Icons';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { lazy, Suspense } from 'react';
 import Login from './components/Login';
@@ -39,142 +53,180 @@ const NavItem: React.FC<{
 
 // 메인 앱 컴포넌트 (인증된 사용자용)
 const MainApp: React.FC = () => {
-  const { currentUser, signOut } = useAuth();
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [purchases, setPurchases] = useState<Purchase[]>(INITIAL_PURCHASES);
-  const [sales, setSales] = useState<Sale[]>(INITIAL_SALES);
-  const [settings, setSettings] = useState<AppSettings>(INITIAL_SETTINGS);
+  const { currentUser } = useAuth();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [settings, setSettings] = useState<AppSettings>({ defaultPackagingCostKrw: 1000, defaultShippingCostKrw: 3000 });
   const [activeView, setActiveView] = useState<View>('dashboard');
 
-  const uuid = () => `id_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-  const handleAddProduct = (product: Product) => {
-    setProducts(prev => [...prev, product]);
-  };
-
-  const handleUpdateProduct = (updatedProduct: Product) => {
-    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-  };
-
-  const handleUpdateProductOption = (productId: string, optionId: string, updates: Partial<ProductOption>) => {
-    setProducts(prev => prev.map(product => {
-      if (product.id === productId) {
-        return {
-          ...product,
-          options: product.options.map(option => {
-            if (option.id === optionId) {
-              return { ...option, ...updates };
-            }
-            return option;
-          })
-        };
+  // 데이터 로딩
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [productsData, salesData, purchasesData, settingsData] = await Promise.all([
+          getProducts(),
+          getSales(),
+          getPurchases(),
+          getSettings()
+        ]);
+        
+        setProducts(productsData);
+        setSales(salesData);
+        setPurchases(purchasesData);
+        setSettings(settingsData);
+      } catch (error) {
+        console.error('데이터 로딩 실패:', error);
       }
-      return product;
-    }));
-  };
+    };
 
-  const handleDeleteProduct = (productId: string) => {
-    setProducts(prev => prev.filter(p => p.id !== productId));
-  };
+    if (currentUser) {
+      loadData();
+    }
+  }, [currentUser]);
 
-  const handleAddPurchase = (purchase: Omit<Purchase, 'id'>) => {
-    const newPurchase: Purchase = { ...purchase, id: uuid() };
-    setPurchases(prev => [...prev, newPurchase]);
-
-    setProducts(prevProducts => {
-      const newProducts = JSON.parse(JSON.stringify(prevProducts));
-
-      // 1. Calculate total cost of the purchase in KRW
-      const totalItemsCostCny = newPurchase.items.reduce(
-        (sum, item) => sum + item.quantity * item.costCnyPerItem, 0
-      );
-      const totalItemsCostKrw = totalItemsCostCny * CNY_TO_KRW_RATE;
-
-
-      const totalAdditionalCostsKrw = newPurchase.shippingCostKrw + newPurchase.customsFeeKrw + newPurchase.otherFeeKrw;
-      const totalPurchaseCostKrw = totalItemsCostKrw + totalAdditionalCostsKrw;
-
-      // 2. Calculate total quantity in the purchase
-      const totalQuantity = newPurchase.items.reduce((sum, item) => sum + item.quantity, 0);
-
-      // 3. Calculate the average landed cost per item for this specific purchase
-      const averageLandedCostPerItemKrw = totalQuantity > 0 ? totalPurchaseCostKrw / totalQuantity : 0;
-
-      if (averageLandedCostPerItemKrw <= 0) {
-        // Nothing to update if cost is zero or negative, but still update stock
-        newPurchase.items.forEach(item => {
-          const product = newProducts.find((p: Product) => p.id === item.productId);
-          if (!product) return;
-          const option = product.options.find((o: any) => o.id === item.optionId);
-          if (!option) return;
-          option.stock += item.quantity;
-        });
-        return newProducts;
-      }
-
-      // 4. Update each product option's costOfGoods using moving average
-      newPurchase.items.forEach(item => {
-        const product = newProducts.find((p: Product) => p.id === item.productId);
-        if (!product) return;
-
-        const option = product.options.find((o: any) => o.id === item.optionId);
-        if (!option) return;
-
-        const oldTotalValue = option.costOfGoods * option.stock;
-        const newItemsTotalValue = averageLandedCostPerItemKrw * item.quantity;
-        const newTotalStock = option.stock + item.quantity;
-
-        // Apply moving average formula
-        option.costOfGoods = newTotalStock > 0 ? (oldTotalValue + newItemsTotalValue) / newTotalStock : averageLandedCostPerItemKrw;
-        option.stock += item.quantity;
-      });
-
-      return newProducts;
-    });
-  };
-
-  const handleAddSale = (sale: Omit<Sale, 'id'>) => {
-    const newSale: Sale = { ...sale, id: uuid() };
-    setSales(prev => [...prev, newSale]);
-
-    setProducts(prevProducts => {
-      const newProducts = JSON.parse(JSON.stringify(prevProducts));
-      const product = newProducts.find((p: Product) => p.id === newSale.productId);
-      if (product) {
-        const option = product.options.find((o: any) => o.id === newSale.optionId);
-        if (option) {
-          option.stock -= newSale.quantity;
-        }
-      }
-      return newProducts;
-    });
-  };
-
-  const handleUpdateSettings = (newSettings: AppSettings) => {
-    setSettings(newSettings);
-  };
-
-  // 완전 초기화 (모든 데이터를 0으로)
-  const handleCompleteReset = () => {
-    if (window.confirm("정말로 모든 데이터를 완전히 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!\n- 모든 상품 데이터 삭제\n- 모든 매입 내역 삭제\n- 모든 매출 내역 삭제\n- 재고 현황 초기화\n\n앱이 완전히 빈 상태로 초기화됩니다.")) {
-      setProducts(EMPTY_PRODUCTS);
-      setPurchases(EMPTY_PURCHASES);
-      setSales(EMPTY_SALES);
-      setSettings(INITIAL_SETTINGS);
-      setActiveView('dashboard');
-      alert("✅ 모든 데이터가 완전히 초기화되었습니다.\n이제 새로운 상품부터 등록해보세요!");
+  const handleAddProduct = async (product: Product) => {
+    try {
+      const newProduct = await addProduct(product);
+      setProducts(prev => [...prev, newProduct]);
+    } catch (error) {
+      console.error('상품 추가 실패:', error);
+      alert('상품 추가에 실패했습니다.');
     }
   };
 
-  // 샘플 데이터로 초기화
-  const handleLoadSampleData = () => {
-    if (window.confirm("샘플 데이터를 불러오시겠습니까?\n\n📦 포함되는 데이터:\n- 샘플 상품 2개 (셔츠, 바지)\n- 샘플 매입 내역 1건\n- 샘플 매출 내역 5건\n\n현재 데이터는 모두 교체됩니다.")) {
-      setProducts(INITIAL_PRODUCTS);
-      setPurchases(INITIAL_PURCHASES);
-      setSales(INITIAL_SALES);
-      setSettings(INITIAL_SETTINGS);
-      setActiveView('dashboard');
-      alert("✅ 샘플 데이터가 성공적으로 로드되었습니다!\n대시보드에서 데이터를 확인해보세요.");
+  const handleUpdateProduct = async (updatedProduct: Product) => {
+    try {
+      await updateProduct(updatedProduct);
+      setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    } catch (error) {
+      console.error('상품 수정 실패:', error);
+      alert('상품 수정에 실패했습니다.');
+    }
+  };
+
+  const handleUpdateProductOption = async (productId: string, optionId: string, updates: Partial<ProductOption>) => {
+    try {
+      await updateProductOption(productId, optionId, updates);
+      setProducts(prev => prev.map(product => {
+        if (product.id === productId) {
+          return {
+            ...product,
+            options: product.options.map(option => {
+              if (option.id === optionId) {
+                return { ...option, ...updates };
+              }
+              return option;
+            })
+          };
+        }
+        return product;
+      }));
+    } catch (error) {
+      console.error('상품 옵션 수정 실패:', error);
+      alert('상품 옵션 수정에 실패했습니다.');
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    try {
+      await deleteProduct(productId);
+      setProducts(prev => prev.filter(p => p.id !== productId));
+    } catch (error) {
+      console.error('상품 삭제 실패:', error);
+      alert('상품 삭제에 실패했습니다.');
+    }
+  };
+
+  const handleAddPurchase = async (purchase: Omit<Purchase, 'id'>) => {
+    try {
+      await addPurchase(purchase);
+      // 데이터 새로고침
+      const [productsData, purchasesData] = await Promise.all([
+        getProducts(),
+        getPurchases()
+      ]);
+      setProducts(productsData);
+      setPurchases(purchasesData);
+    } catch (error) {
+      console.error('매입 추가 실패:', error);
+      alert('매입 추가에 실패했습니다.');
+    }
+  };
+
+  const handleAddSale = async (sale: Omit<Sale, 'id'>) => {
+    try {
+      await addSale(sale);
+      // 데이터 새로고침
+      const [productsData, salesData] = await Promise.all([
+        getProducts(),
+        getSales()
+      ]);
+      setProducts(productsData);
+      setSales(salesData);
+    } catch (error) {
+      console.error('매출 추가 실패:', error);
+      alert('매출 추가에 실패했습니다.');
+    }
+  };
+
+  const handleUpdateSettings = async (newSettings: AppSettings) => {
+    try {
+      await updateSettings(newSettings);
+      setSettings(newSettings);
+    } catch (error) {
+      console.error('설정 업데이트 실패:', error);
+      alert('설정 업데이트에 실패했습니다.');
+    }
+  };
+
+  // 완전 초기화 (모든 데이터를 0으로) - Supabase에서는 실제 DB 삭제
+  const handleCompleteReset = async () => {
+    if (window.confirm("정말로 모든 데이터를 완전히 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!\n- 모든 상품 데이터 삭제\n- 모든 매입 내역 삭제\n- 모든 매출 내역 삭제\n- 재고 현황 초기화\n\n데이터베이스에서 완전히 삭제됩니다.")) {
+      try {
+        await deleteAllData();
+        // 데이터 새로고침
+        const [productsData, salesData, purchasesData, settingsData] = await Promise.all([
+          getProducts(),
+          getSales(),
+          getPurchases(),
+          getSettings()
+        ]);
+        
+        setProducts(productsData);
+        setSales(salesData);
+        setPurchases(purchasesData);
+        setSettings(settingsData);
+        
+        alert("✅ 모든 데이터가 성공적으로 삭제되었습니다.");
+      } catch (error) {
+        console.error('데이터 삭제 실패:', error);
+        alert('데이터 삭제에 실패했습니다.');
+      }
+    }
+  };
+
+  // 샘플 데이터로 초기화 - Supabase에서는 실제 샘플 데이터 생성
+  const handleLoadSampleData = async () => {
+    if (window.confirm("샘플 데이터를 생성하시겠습니까?\n\n📦 생성될 데이터:\n- 샘플 상품 2개 (면 셔츠, 청바지)\n- 샘플 매입 내역 1건\n- 샘플 매출 내역 5건\n\n기존 데이터에 추가됩니다.")) {
+      try {
+        await createSampleData();
+        // 데이터 새로고침
+        const [productsData, salesData, purchasesData] = await Promise.all([
+          getProducts(),
+          getSales(),
+          getPurchases()
+        ]);
+        
+        setProducts(productsData);
+        setSales(salesData);
+        setPurchases(purchasesData);
+        
+        alert("✅ 샘플 데이터가 성공적으로 생성되었습니다!\n\n대시보드에서 확인해보세요.");
+      } catch (error) {
+        console.error('샘플 데이터 생성 실패:', error);
+        alert('샘플 데이터 생성에 실패했습니다: ' + error.message);
+      }
     }
   };
 
@@ -281,6 +333,7 @@ const MainApp: React.FC = () => {
 
 // 루트 App 컴포넌트 (인증 상태에 따라 Login 또는 MainApp 렌더링)
 const App: React.FC = () => {
+  console.log('App 컴포넌트 렌더링 시작');
   return (
     <AuthProvider>
       <AppContent />
@@ -289,28 +342,56 @@ const App: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { currentUser, loading } = useAuth();
+  console.log('AppContent 컴포넌트 렌더링 시작');
+  
+  try {
+    const { currentUser, loading } = useAuth();
+    console.log('Auth 상태:', JSON.stringify({ 
+      currentUser: !!currentUser, 
+      loading,
+      timestamp: new Date().toLocaleTimeString()
+    }));
 
-  if (loading) {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <span className="text-white text-2xl font-bold">S</span>
+            </div>
+            <h1 className="text-2xl font-bold text-blue-600 mb-4">Seller Roo</h1>
+            <div className="flex items-center justify-center space-x-2 mb-4">
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+            </div>
+            <p className="text-gray-600">시스템을 준비하고 있습니다...</p>
+          </div>
+        </div>
+      );
+    }
+
+    return currentUser ? <MainApp /> : <Login />;
+  } catch (error) {
+    console.error('AppContent 렌더링 오류:', error);
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <span className="text-white text-2xl font-bold">S</span>
-          </div>
-          <h1 className="text-2xl font-bold text-blue-600 mb-4">Seller Roo</h1>
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-          </div>
-          <p className="text-gray-600">시스템을 준비하고 있습니다...</p>
+      <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-md">
+          <h2 className="text-xl font-bold text-red-600 mb-4">오류가 발생했습니다</h2>
+          <p className="text-gray-700 mb-4">앱을 로드하는 중 문제가 발생했습니다.</p>
+          <pre className="bg-gray-100 p-3 rounded text-xs overflow-auto max-h-40">
+            {error instanceof Error ? error.message : '알 수 없는 오류'}
+          </pre>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            페이지 새로고침
+          </button>
         </div>
       </div>
     );
   }
-
-  return currentUser ? <MainApp /> : <Login />;
 };
 
 export default App;

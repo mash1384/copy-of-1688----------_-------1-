@@ -24,13 +24,13 @@ const UserProfile: React.FC = () => {
         className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition duration-200"
       >
         <img
-          src={currentUser.photoURL || '/default-avatar.png'}
-          alt={currentUser.displayName || '사용자'}
+          src={currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture || '/default-avatar.png'}
+          alt={currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || '사용자'}
           className="w-8 h-8 rounded-full"
         />
         <div className="text-left">
           <div className="text-sm font-medium text-gray-900">
-            {currentUser.displayName || '사용자'}
+            {currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || '사용자'}
           </div>
           <div className="text-xs text-gray-500">
             {currentUser.email}
@@ -52,7 +52,7 @@ const UserProfile: React.FC = () => {
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
           <div className="px-4 py-2 border-b border-gray-100">
             <div className="text-sm font-medium text-gray-900">
-              {currentUser.displayName}
+              {currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || '사용자'}
             </div>
             <div className="text-xs text-gray-500">
               {currentUser.email}

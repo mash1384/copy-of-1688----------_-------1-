@@ -1,14 +1,12 @@
 import * as React from 'react';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User } from 'firebase/auth';
+import { User } from '@supabase/supabase-js';
 import { 
-  onAuthStateChangedListener, 
+  supabase,
   signInWithGoogle, 
-  signOutUser,
-  createOrUpdateUser,
-  getUserData,
-  UserData
-} from '../firebase';
+  signOut,
+  createOrUpdateUser
+} from '../lib/supabase';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -36,23 +34,80 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChangedListener((user) => {
-      setCurrentUser(user);
-      setLoading(false);
-    });
+    console.log('AuthProvider useEffect 시작');
+    let mounted = true;
+    
+    // 초기화 함수
+    const initializeAuth = async () => {
+      try {
+        console.log('getSession 호출 시작');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('getSession 결과:', { session: !!session, error });
+        
+        if (error) {
+          console.error('getSession 오류:', error);
+        }
+        
+        if (mounted) {
+          setCurrentUser(session?.user ?? null);
+          setLoading(false);
+          console.log('초기 로딩 완료, loading을 false로 설정');
+        }
+      } catch (error) {
+        console.error('getSession 예외:', error);
+        if (mounted) {
+          setCurrentUser(null);
+          setLoading(false);
+          console.log('오류 발생으로 로딩 해제, 로그인 화면 표시');
+        }
+      }
+    };
 
-    return unsubscribe;
+    // 인증 상태 변경 감지
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth 상태 변경:', JSON.stringify({ event, session: !!session }));
+        
+        if (mounted) {
+          setCurrentUser(session?.user ?? null);
+          
+          // 먼저 로딩 상태를 해제
+          setLoading(false);
+          console.log('Auth 상태 변경 후 loading을 false로 설정');
+          
+          // 로그인 시 사용자 데이터 생성/업데이트 (백그라운드에서 실행)
+          if (event === 'SIGNED_IN' && session?.user) {
+            try {
+              await createOrUpdateUser(session.user);
+              console.log('사용자 데이터 생성/업데이트 완료');
+            } catch (error) {
+              console.error('사용자 데이터 생성/업데이트 실패:', error);
+            }
+          }
+        }
+      }
+    );
+
+    // 초기화 실행
+    initializeAuth();
+
+    return () => {
+      console.log('AuthProvider cleanup');
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSignInWithGoogle = async () => {
-    const user = await signInWithGoogle();
-    // 소셜 로그인 시 자동으로 사용자 데이터 생성/업데이트
-    await createOrUpdateUser(user);
-    return user;
+    const result = await signInWithGoogle();
+    if (result.error) throw result.error;
+    
+    // 사용자 정보는 onAuthStateChange에서 처리됨
+    return currentUser!;
   };
 
   const handleSignOut = async () => {
-    await signOutUser();
+    await signOut();
   };
 
   const value: AuthContextType = {
@@ -64,7 +119,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
