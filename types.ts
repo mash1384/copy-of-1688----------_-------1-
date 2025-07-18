@@ -22,8 +22,10 @@ export interface ProductOption {
 export interface Product {
   id: string;
   name: string;
+  chineseName?: string; // 중국어 상품명
   imageUrl: string; // URL or Base64 Data URL
   baseCostCny: number; // 1688 매입 원가 (위안)
+  sourceUrl?: string; // 1688 상품 URL
   options: ProductOption[];
 }
 

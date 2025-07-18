@@ -14,6 +14,8 @@ const uuid = () => `id_${Date.now()}_${Math.random().toString(36).substring(2, 9
 
 const ProductForm: React.FC<ProductFormProps> = ({ productToEdit, onSave, onCancel }) => {
   const [name, setName] = useState('');
+  const [chineseName, setChineseName] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [baseCostCny, setBaseCostCny] = useState<number | ''>('');
   const [options, setOptions] = useState<{ name: string; sku: string }[]>([{ name: '', sku: '' }]);
@@ -21,11 +23,15 @@ const ProductForm: React.FC<ProductFormProps> = ({ productToEdit, onSave, onCanc
   useEffect(() => {
     if (productToEdit) {
       setName(productToEdit.name);
+      setChineseName(productToEdit.chineseName || '');
+      setSourceUrl(productToEdit.sourceUrl || '');
       setImageUrl(productToEdit.imageUrl);
       setBaseCostCny(productToEdit.baseCostCny);
       setOptions(productToEdit.options.map(({ name, sku }) => ({ name, sku })));
     } else {
       setName('');
+      setChineseName('');
+      setSourceUrl('');
       setImageUrl(null);
       setBaseCostCny('');
       setOptions([{ name: '', sku: '' }]);
@@ -59,6 +65,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ productToEdit, onSave, onCanc
     const newProductData: Product = {
       id: productToEdit ? productToEdit.id : uuid(),
       name,
+      chineseName: chineseName || undefined,
+      sourceUrl: sourceUrl || undefined,
       imageUrl,
       baseCostCny,
       options: options.map((opt, index) => {
@@ -85,12 +93,45 @@ const ProductForm: React.FC<ProductFormProps> = ({ productToEdit, onSave, onCanc
         />
       </div>
       <div>
-        <label htmlFor="productName" className="block text-sm font-medium text-gray-700">상품명</label>
-        <input type="text" id="productName" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+        <label htmlFor="productName" className="block text-sm font-medium text-gray-700">상품명 (한국어)</label>
+        <input type="text" id="productName" value={name} onChange={e => setName(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="예: 여성 니트 스웨터" />
       </div>
+      
+      <div>
+        <label htmlFor="chineseName" className="block text-sm font-medium text-gray-700">중국어 상품명</label>
+        <input 
+          type="text" 
+          id="chineseName" 
+          value={chineseName} 
+          onChange={e => setChineseName(e.target.value)} 
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
+          placeholder="例: 女士针织毛衣"
+        />
+        <p className="mt-1 text-xs text-gray-500">1688에서 복사한 중국어 상품명을 입력하세요 (선택사항)</p>
+      </div>
+
+      <div>
+        <label htmlFor="sourceUrl" className="block text-sm font-medium text-gray-700">1688 상품 URL</label>
+        <input 
+          type="url" 
+          id="sourceUrl" 
+          value={sourceUrl} 
+          onChange={e => setSourceUrl(e.target.value)} 
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
+          placeholder="https://detail.1688.com/offer/..."
+        />
+        <p className="mt-1 text-xs text-gray-500">1688 상품 페이지 링크를 입력하세요 (선택사항)</p>
+      </div>
+      
       <div>
         <label htmlFor="baseCostCny" className="block text-sm font-medium text-gray-700">1688 매입 원가 (위안)</label>
-        <input type="number" id="baseCostCny" value={baseCostCny} onChange={e => setBaseCostCny(Number(e.target.value))} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+        <div className="mt-1 relative">
+          <input type="number" id="baseCostCny" value={baseCostCny} onChange={e => setBaseCostCny(Number(e.target.value))} required className="block w-full px-3 py-2 pr-12 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="0.00" step="0.01" />
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+            <span className="text-gray-500 text-sm">¥</span>
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-gray-500">1688에서 확인한 개당 매입가를 위안(¥) 단위로 입력하세요</p>
       </div>
       <div className="space-y-4">
         <h4 className="text-md font-medium text-gray-800">상품 옵션</h4>
