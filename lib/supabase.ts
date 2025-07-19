@@ -265,22 +265,30 @@ export const signOut = async () => {
 
 // 사용자 데이터 생성/업데이트
 export const createOrUpdateUser = async (user: any) => {
-  const { data, error } = await supabase
-    .from('users')
-    .upsert({
-      id: user.id,
-      email: user.email || '',
-      display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
-      photo_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
-      provider: 'google',
-      last_login_at: new Date().toISOString()
-    })
-    .select()
-    .single()
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .upsert({
+        id: user.id,
+        email: user.email || '',
+        display_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+        photo_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
+        provider: 'google',
+        last_login_at: new Date().toISOString()
+      })
+      .select()
+      .single()
 
-  if (error && error.code !== '23505') { // 23505는 unique constraint violation
-    throw error
+    if (error) {
+      console.error('사용자 생성/업데이트 오류:', error)
+      // RLS 정책 오류나 기타 오류가 발생해도 앱이 계속 작동하도록 함
+      return null
+    }
+    
+    console.log('사용자 데이터 생성/업데이트 성공:', data)
+    return data
+  } catch (error) {
+    console.error('사용자 생성/업데이트 예외:', error)
+    return null
   }
-  
-  return data
 }

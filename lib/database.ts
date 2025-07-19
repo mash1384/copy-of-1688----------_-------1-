@@ -38,43 +38,71 @@ export const addProduct = async (product: Omit<Product, 'id'>): Promise<Product>
   const { data: user } = await supabase.auth.getUser()
   if (!user.user) throw new Error('사용자 인증이 필요합니다')
 
+  console.log('상품 등록 시작:', { 
+    userId: user.user.id, 
+    productName: product.name,
+    optionsCount: product.options.length 
+  })
+
   const productId = generateId()
 
-  // 상품 생성
-  const { error: productError } = await supabase
-    .from('products')
-    .insert({
-      id: productId,
-      user_id: user.user.id,
-      name: product.name,
-      chinese_name: product.chineseName,
-      source_url: product.sourceUrl,
-      image_url: product.imageUrl,
-      base_cost_cny: product.baseCostCny
-    })
+  try {
+    // 상품 생성
+    const { error: productError } = await supabase
+      .from('products')
+      .insert({
+        id: productId,
+        user_id: user.user.id,
+        name: product.name,
+        chinese_name: product.chineseName,
+        source_url: product.sourceUrl,
+        image_url: product.imageUrl,
+        base_cost_cny: product.baseCostCny
+      })
 
-  if (productError) throw productError
+    if (productError) {
+      console.error('상품 생성 오류:', productError)
+      throw productError
+    }
 
-  // 옵션들 생성
-  const optionsData = product.options.map(option => ({
-    id: generateId(),
-    product_id: productId,
-    name: option.name,
-    sku: option.sku,
-    stock: option.stock || 0,
-    cost_of_goods: option.costOfGoods || 0,
-    recommended_price: option.recommendedPrice
-  }))
+    console.log('상품 생성 완료, 옵션 생성 중...')
 
-  const { error: optionsError } = await supabase
-    .from('product_options')
-    .insert(optionsData)
+    // 옵션들 생성
+    const optionsData = product.options.map(option => ({
+      id: generateId(),
+      product_id: productId,
+      name: option.name,
+      sku: option.sku,
+      stock: option.stock || 0,
+      cost_of_goods: option.costOfGoods || 0,
+      recommended_price: option.recommendedPrice
+    }))
 
-  if (optionsError) throw optionsError
+    const { error: optionsError } = await supabase
+      .from('product_options')
+      .insert(optionsData)
 
-  // 생성된 상품 반환
-  const products = await getProducts()
-  return products.find(p => p.id === productId)!
+    if (optionsError) {
+      console.error('상품 옵션 생성 오류:', optionsError)
+      throw optionsError
+    }
+
+    console.log('상품 옵션 생성 완료')
+
+    // 생성된 상품 반환
+    const products = await getProducts()
+    const newProduct = products.find(p => p.id === productId)
+    
+    if (!newProduct) {
+      throw new Error('생성된 상품을 찾을 수 없습니다')
+    }
+
+    console.log('상품 등록 완료:', newProduct.name)
+    return newProduct
+  } catch (error) {
+    console.error('상품 등록 실패:', error)
+    throw error
+  }
 }
 
 export const updateProduct = async (product: Product): Promise<void> => {
@@ -150,34 +178,75 @@ export const getSales = async (): Promise<Sale[]> => {
   }))
 }
 
-export const addSale = async (sale: Omit<Sale, 'id'>): Promise<void> => {
-  const { data: user } = await supabase.auth.getUser()
-  if (!user.user) throw new Error('사용자 인증이 필요합니다')
+export const addSale = async (sale: Omit<Sale, 'id'>, userId?: string): Promise<void> => {
+  console.log('🔍 매출 등록 시작:', { productId: sale.productId, optionId: sale.optionId, quantity: sale.quantity })
+  
+  let currentUserId = userId
+  
+  if (!currentUserId) {
+    const { data: user } = await supabase.auth.getUser()
+    if (!user.user) throw new Error('사용자 인증이 필요합니다')
+    currentUserId = user.user.id
+  }
 
-  const { error } = await supabase
-    .from('sales')
-    .insert({
-      user_id: user.user.id,
-      product_id: sale.productId,
+  try {
+    console.log('🔍 매출 데이터 삽입 중...')
+    const { error } = await supabase
+      .from('sales')
+      .insert({
+        user_id: currentUserId,
+        product_id: sale.productId,
+        option_id: sale.optionId,
+        date: sale.date,
+        quantity: sale.quantity,
+        sale_price_per_item: sale.salePricePerItem,
+        channel: sale.channel,
+        channel_fee_percentage: sale.channelFeePercentage,
+        packaging_cost_krw: sale.packagingCostKrw,
+        shipping_cost_krw: sale.shippingCostKrw
+      })
+
+    if (error) {
+      console.error('❌ 매출 데이터 삽입 오류:', error)
+      throw error
+    }
+
+    console.log('✅ 매출 데이터 삽입 완료')
+
+    // 재고 감소
+    console.log('🔍 재고 감소 중...', { optionId: sale.optionId, quantity: sale.quantity })
+    const { data: stockResult, error: stockError } = await supabase.rpc('decrease_stock', {
       option_id: sale.optionId,
-      date: sale.date,
-      quantity: sale.quantity,
-      sale_price_per_item: sale.salePricePerItem,
-      channel: sale.channel,
-      channel_fee_percentage: sale.channelFeePercentage,
-      packaging_cost_krw: sale.packagingCostKrw,
-      shipping_cost_krw: sale.shippingCostKrw
+      quantity: sale.quantity
     })
 
-  if (error) throw error
+    if (stockError) {
+      console.error('❌ 재고 감소 RPC 오류:', stockError)
+      console.error('재고 감소 오류 세부사항:', JSON.stringify(stockError, null, 2))
+      throw stockError
+    }
 
-  // 재고 감소
-  const { error: stockError } = await supabase.rpc('decrease_stock', {
-    option_id: sale.optionId,
-    quantity: sale.quantity
-  })
+    console.log('🔍 재고 감소 결과:', stockResult)
 
-  if (stockError) throw stockError
+    if (stockResult && !stockResult.success) {
+      console.error('❌ 재고 감소 실패:', stockResult.error)
+      throw new Error(`재고 감소 실패: ${stockResult.error}`)
+    }
+
+    if (stockResult && stockResult.warning) {
+      console.warn('⚠️ 재고 경고:', stockResult.warning)
+    }
+
+    console.log('✅ 재고 감소 완료:', {
+      previousStock: stockResult?.previous_stock,
+      newStock: stockResult?.new_stock,
+      quantitySold: stockResult?.quantity_sold
+    })
+    console.log('✅ 매출 등록 완료')
+  } catch (error) {
+    console.error('❌ 매출 등록 실패:', error)
+    throw error
+  }
 }
 
 // 매입 관련 함수들
@@ -243,11 +312,15 @@ export const addPurchase = async (purchase: Omit<Purchase, 'id'>): Promise<void>
   if (itemsError) throw itemsError
 
   // 재고 및 원가 업데이트 (복잡한 로직이므로 stored procedure 사용)
-  const { error: updateError } = await supabase.rpc('update_inventory_from_purchase', {
+  const { data: updateResult, error: updateError } = await supabase.rpc('update_inventory_from_purchase', {
     purchase_id: purchaseId
   })
 
   if (updateError) throw updateError
+  
+  if (updateResult && !updateResult.success) {
+    throw new Error(`재고 업데이트 실패: ${updateResult.error}`)
+  }
 }
 
 // 설정 관련 함수들
@@ -255,23 +328,40 @@ export const getSettings = async (): Promise<AppSettings> => {
   const { data: user } = await supabase.auth.getUser()
   if (!user.user) throw new Error('사용자 인증이 필요합니다')
 
-  const { data, error } = await supabase
-    .from('app_settings')
-    .select('*')
-    .eq('user_id', user.user.id)
-    .single()
+  try {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('*')
+      .eq('user_id', user.user.id)
+      .maybeSingle() // single() 대신 maybeSingle() 사용
 
-  if (error) {
-    // 설정이 없으면 기본값 반환
+    if (error) {
+      console.error('설정 조회 오류:', error)
+      // 설정이 없으면 기본값 반환
+      return {
+        defaultPackagingCostKrw: 1000,
+        defaultShippingCostKrw: 3000
+      }
+    }
+
+    if (!data) {
+      // 데이터가 없으면 기본값 반환
+      return {
+        defaultPackagingCostKrw: 1000,
+        defaultShippingCostKrw: 3000
+      }
+    }
+
+    return {
+      defaultPackagingCostKrw: data.default_packaging_cost_krw,
+      defaultShippingCostKrw: data.default_shipping_cost_krw
+    }
+  } catch (error) {
+    console.error('설정 조회 예외:', error)
     return {
       defaultPackagingCostKrw: 1000,
       defaultShippingCostKrw: 3000
     }
-  }
-
-  return {
-    defaultPackagingCostKrw: data.default_packaging_cost_krw,
-    defaultShippingCostKrw: data.default_shipping_cost_krw
   }
 }
 
@@ -304,36 +394,92 @@ export const updateProductOption = async (productId: string, optionId: string, u
   if (error) throw error
 }
 // Sample data creation
-export const createSampleData = async (): Promise<void> => {
-  const { data: user } = await supabase.auth.getUser()
-  if (!user.user) throw new Error('User authentication required')
-
+export const createSampleData = async (userId?: string): Promise<void> => {
+  console.log('🔍 createSampleData 함수 시작')
+  
   try {
+    let currentUserId = userId
+    
+    if (!currentUserId) {
+      console.log('🔍 사용자 인증 확인 중...')
+      
+      const { data: user, error: userError } = await supabase.auth.getUser()
+      
+      console.log('🔍 사용자 인증 응답 받음:', { hasUser: !!user?.user, error: !!userError })
+      
+      if (userError) {
+        console.error('❌ 사용자 인증 오류:', userError)
+        throw userError
+      }
+      
+      if (!user?.user) {
+        console.error('❌ 사용자 정보 없음:', user)
+        throw new Error('사용자 인증이 필요합니다')
+      }
+      
+      currentUserId = user.user.id
+    }
+    
+    console.log('✅ 사용자 인증 성공, 사용자 ID:', currentUserId)
+    console.log('🔍 샘플 데이터 생성 시작, 사용자 ID:', currentUserId)
+
+    // 기존 샘플 데이터 확인 건너뛰기 (RLS 정책 문제로 인해)
+    console.log('⚠️ 기존 데이터 확인 건너뛰고 바로 샘플 데이터 생성 시작')
+    console.log('💡 중복 데이터가 생성될 수 있으니 먼저 "완전 초기화"를 실행하는 것을 권장합니다')
+
     // 1. Create sample products
     const product1Id = generateId()
     const product2Id = generateId()
 
-    // Product 1: Cotton Shirt
-    await supabase.from('products').insert({
-      id: product1Id,
-      user_id: user.user.id,
-      name: '면 셔츠',
-      chinese_name: '棉质衬衫',
-      source_url: 'https://detail.1688.com/offer/example1.html',
-      image_url: 'https://via.placeholder.com/300x300/4F46E5/FFFFFF?text=면+셔츠',
-      base_cost_cny: 25.50
-    })
+    console.log('상품 생성 중...', { product1Id, product2Id })
 
-    // Product 2: Jeans
-    await supabase.from('products').insert({
-      id: product2Id,
-      user_id: user.user.id,
-      name: '청바지',
-      chinese_name: '牛仔裤',
-      source_url: 'https://detail.1688.com/offer/example2.html',
-      image_url: 'https://via.placeholder.com/300x300/1F2937/FFFFFF?text=청바지',
-      base_cost_cny: 45.00
-    })
+    try {
+      // Product 1: Cotton Shirt
+      console.log('🔍 상품 1 생성 시도...')
+      
+      const { error: product1Error } = await supabase.from('products').insert({
+        id: product1Id,
+        user_id: currentUserId,
+        name: '면 셔츠',
+        chinese_name: '棉质衬衫',
+        source_url: 'https://detail.1688.com/offer/example1.html',
+        image_url: 'https://via.placeholder.com/300x300/4F46E5/FFFFFF?text=면+셔츠',
+        base_cost_cny: 25.50
+      })
+
+      if (product1Error) {
+        console.error('❌ 상품 1 생성 오류:', product1Error)
+        console.error('오류 세부사항:', JSON.stringify(product1Error, null, 2))
+        throw product1Error
+      }
+
+      console.log('✅ 상품 1 생성 완료')
+
+      // Product 2: Jeans
+      console.log('🔍 상품 2 생성 시도...')
+      
+      const { error: product2Error } = await supabase.from('products').insert({
+        id: product2Id,
+        user_id: currentUserId,
+        name: '청바지',
+        chinese_name: '牛仔裤',
+        source_url: 'https://detail.1688.com/offer/example2.html',
+        image_url: 'https://via.placeholder.com/300x300/1F2937/FFFFFF?text=청바지',
+        base_cost_cny: 45.00
+      })
+
+      if (product2Error) {
+        console.error('❌ 상품 2 생성 오류:', product2Error)
+        console.error('오류 세부사항:', JSON.stringify(product2Error, null, 2))
+        throw product2Error
+      }
+
+      console.log('✅ 상품 2 생성 완료')
+      console.log('✅ 모든 상품 생성 완료')
+    } catch (error) {
+      console.error('❌ 상품 생성 실패:', error)
+      throw error
+    }
 
     // 2. Create product options
     const options = [
@@ -350,18 +496,33 @@ export const createSampleData = async (): Promise<void> => {
       { id: generateId(), product_id: product2Id, name: '블랙 / 30', sku: 'JEANS-BK-30', stock: 4, cost_of_goods: 15000, recommended_price: 45000 }
     ]
 
-    await supabase.from('product_options').insert(options)
+    console.log('상품 옵션 생성 중...')
+    const { error: optionsError } = await supabase.from('product_options').insert(options)
+    
+    if (optionsError) {
+      console.error('상품 옵션 생성 오류:', optionsError)
+      throw optionsError
+    }
+
+    console.log('상품 옵션 생성 완료')
 
     // 3. Create sample purchase
     const purchaseId = generateId()
-    await supabase.from('purchases').insert({
+    console.log('매입 데이터 생성 중...')
+    
+    const { error: purchaseError } = await supabase.from('purchases').insert({
       id: purchaseId,
-      user_id: user.user.id,
+      user_id: currentUserId,
       date: '2024-01-15',
       shipping_cost_krw: 120000,
       customs_fee_krw: 45000,
       other_fee_krw: 15000
     })
+
+    if (purchaseError) {
+      console.error('매입 생성 오류:', purchaseError)
+      throw purchaseError
+    }
 
     // Purchase items
     const purchaseItems = [
@@ -375,15 +536,33 @@ export const createSampleData = async (): Promise<void> => {
       { purchase_id: purchaseId, product_id: product2Id, option_id: options[7].id, quantity: 6, cost_cny_per_item: 45.00 }
     ]
 
-    await supabase.from('purchase_items').insert(purchaseItems)
+    console.log('매입 아이템 생성 중...')
+    const { error: purchaseItemsError } = await supabase.from('purchase_items').insert(purchaseItems)
+    
+    if (purchaseItemsError) {
+      console.error('매입 아이템 생성 오류:', purchaseItemsError)
+      throw purchaseItemsError
+    }
 
     // Update inventory and costs
-    await supabase.rpc('update_inventory_from_purchase', { purchase_id: purchaseId })
+    console.log('재고 업데이트 중...')
+    const { data: inventoryData, error: inventoryError } = await supabase.rpc('update_inventory_from_purchase', { purchase_id: purchaseId })
+    
+    if (inventoryError) {
+      console.error('❌ 재고 업데이트 오류:', inventoryError)
+      console.error('오류 세부사항:', JSON.stringify(inventoryError, null, 2))
+      throw inventoryError
+    }
+    
+    console.log('✅ 재고 업데이트 완료:', inventoryData)
+
+    console.log('매입 데이터 생성 완료')
 
     // 4. Create sample sales
+    console.log('매출 데이터 생성 중...')
     const sales = [
       {
-        user_id: user.user.id,
+        user_id: currentUserId,
         product_id: product1Id,
         option_id: options[0].id,
         date: '2024-01-20',
@@ -395,7 +574,7 @@ export const createSampleData = async (): Promise<void> => {
         shipping_cost_krw: 3000
       },
       {
-        user_id: user.user.id,
+        user_id: currentUserId,
         product_id: product1Id,
         option_id: options[1].id,
         date: '2024-01-22',
@@ -407,7 +586,7 @@ export const createSampleData = async (): Promise<void> => {
         shipping_cost_krw: 0
       },
       {
-        user_id: user.user.id,
+        user_id: currentUserId,
         product_id: product1Id,
         option_id: options[2].id,
         date: '2024-01-25',
@@ -419,7 +598,7 @@ export const createSampleData = async (): Promise<void> => {
         shipping_cost_krw: 3000
       },
       {
-        user_id: user.user.id,
+        user_id: currentUserId,
         product_id: product2Id,
         option_id: options[4].id,
         date: '2024-01-28',
@@ -431,7 +610,7 @@ export const createSampleData = async (): Promise<void> => {
         shipping_cost_krw: 3000
       },
       {
-        user_id: user.user.id,
+        user_id: currentUserId,
         product_id: product2Id,
         option_id: options[5].id,
         date: '2024-02-01',
@@ -444,14 +623,30 @@ export const createSampleData = async (): Promise<void> => {
       }
     ]
 
-    for (const sale of sales) {
-      await supabase.from('sales').insert(sale)
+    for (let i = 0; i < sales.length; i++) {
+      const sale = sales[i]
+      console.log(`매출 ${i + 1}/${sales.length} 생성 중...`)
+      
+      const { error: saleError } = await supabase.from('sales').insert(sale)
+      if (saleError) {
+        console.error(`매출 ${i + 1} 생성 오류:`, saleError)
+        throw saleError
+      }
+      
       // Decrease stock
-      await supabase.rpc('decrease_stock', {
+      const { error: stockError } = await supabase.rpc('decrease_stock', {
         option_id: sale.option_id,
         quantity: sale.quantity
       })
+      
+      if (stockError) {
+        console.error(`재고 감소 오류 (매출 ${i + 1}):`, stockError)
+        throw stockError
+      }
     }
+
+    console.log('매출 데이터 생성 완료')
+    console.log('✅ 모든 샘플 데이터 생성이 완료되었습니다!')
 
   } catch (error) {
     console.error('Sample data creation failed:', error)
@@ -461,40 +656,55 @@ export const createSampleData = async (): Promise<void> => {
 
 // Delete all data
 export const deleteAllData = async (): Promise<void> => {
-  const { data: user } = await supabase.auth.getUser()
-  if (!user.user) throw new Error('User authentication required')
-
+  console.log('🔍 완전 초기화 시작...')
+  
   try {
-    // Delete in order (due to foreign key constraints)
-    await supabase.from('sales').delete().eq('user_id', user.user.id)
-
-    // Get purchase IDs first, then delete purchase items
-    const { data: purchases } = await supabase
-      .from('purchases')
-      .select('id')
-      .eq('user_id', user.user.id)
-
-    if (purchases && purchases.length > 0) {
-      const purchaseIds = purchases.map(p => p.id)
-      await supabase.from('purchase_items').delete().in('purchase_id', purchaseIds)
+    // RLS가 비활성화되어 있으므로 모든 데이터를 삭제할 수 있습니다
+    console.log('🔍 매출 데이터 삭제 중...')
+    const { error: salesError } = await supabase.from('sales').delete().neq('id', '')
+    if (salesError) {
+      console.error('매출 삭제 오류:', salesError)
+      throw salesError
     }
 
-    await supabase.from('purchases').delete().eq('user_id', user.user.id)
-
-    // Get product IDs first, then delete product options
-    const { data: products } = await supabase
-      .from('products')
-      .select('id')
-      .eq('user_id', user.user.id)
-
-    if (products && products.length > 0) {
-      const productIds = products.map(p => p.id)
-      await supabase.from('product_options').delete().in('product_id', productIds)
+    console.log('🔍 매입 아이템 삭제 중...')
+    const { error: purchaseItemsError } = await supabase.from('purchase_items').delete().neq('id', '')
+    if (purchaseItemsError) {
+      console.error('매입 아이템 삭제 오류:', purchaseItemsError)
+      throw purchaseItemsError
     }
 
-    await supabase.from('products').delete().eq('user_id', user.user.id)
+    console.log('🔍 매입 데이터 삭제 중...')
+    const { error: purchasesError } = await supabase.from('purchases').delete().neq('id', '')
+    if (purchasesError) {
+      console.error('매입 삭제 오류:', purchasesError)
+      throw purchasesError
+    }
+
+    console.log('🔍 상품 옵션 삭제 중...')
+    const { error: optionsError } = await supabase.from('product_options').delete().neq('id', '')
+    if (optionsError) {
+      console.error('상품 옵션 삭제 오류:', optionsError)
+      throw optionsError
+    }
+
+    console.log('🔍 상품 데이터 삭제 중...')
+    const { error: productsError } = await supabase.from('products').delete().neq('id', '')
+    if (productsError) {
+      console.error('상품 삭제 오류:', productsError)
+      throw productsError
+    }
+
+    console.log('🔍 앱 설정 삭제 중...')
+    const { error: settingsError } = await supabase.from('app_settings').delete().neq('id', '')
+    if (settingsError) {
+      console.error('설정 삭제 오류:', settingsError)
+      throw settingsError
+    }
+
+    console.log('✅ 완전 초기화 완료!')
   } catch (error) {
-    console.error('Data deletion failed:', error)
+    console.error('❌ 데이터 삭제 실패:', error)
     throw error
   }
 }

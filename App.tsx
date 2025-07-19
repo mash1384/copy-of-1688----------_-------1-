@@ -87,11 +87,15 @@ const MainApp: React.FC = () => {
 
   const handleAddProduct = async (product: Product) => {
     try {
+      console.log('상품 추가 요청:', product.name)
       const newProduct = await addProduct(product);
       setProducts(prev => [...prev, newProduct]);
+      console.log('상품 추가 성공:', newProduct.name)
+      alert('✅ 상품이 성공적으로 등록되었습니다!')
     } catch (error) {
       console.error('상품 추가 실패:', error);
-      alert('상품 추가에 실패했습니다.');
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다'
+      alert(`❌ 상품 추가에 실패했습니다:\n${errorMessage}\n\n브라우저 콘솔을 확인해주세요.`);
     }
   };
 
@@ -156,7 +160,11 @@ const MainApp: React.FC = () => {
 
   const handleAddSale = async (sale: Omit<Sale, 'id'>) => {
     try {
-      await addSale(sale);
+      console.log('매출 추가 요청:', { productId: sale.productId, optionId: sale.optionId, quantity: sale.quantity })
+      // 현재 사용자 ID를 직접 전달
+      await addSale(sale, currentUser?.id);
+      console.log('매출 추가 성공, 데이터 새로고침 중...')
+      
       // 데이터 새로고침
       const [productsData, salesData] = await Promise.all([
         getProducts(),
@@ -164,9 +172,13 @@ const MainApp: React.FC = () => {
       ]);
       setProducts(productsData);
       setSales(salesData);
+      
+      console.log('데이터 새로고침 완료')
+      alert('✅ 매출이 성공적으로 등록되었습니다!')
     } catch (error) {
       console.error('매출 추가 실패:', error);
-      alert('매출 추가에 실패했습니다.');
+      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다'
+      alert(`❌ 매출 추가에 실패했습니다:\n${errorMessage}\n\n브라우저 콘솔을 확인해주세요.`);
     }
   };
 
@@ -210,7 +222,11 @@ const MainApp: React.FC = () => {
   const handleLoadSampleData = async () => {
     if (window.confirm("샘플 데이터를 생성하시겠습니까?\n\n📦 생성될 데이터:\n- 샘플 상품 2개 (면 셔츠, 청바지)\n- 샘플 매입 내역 1건\n- 샘플 매출 내역 5건\n\n기존 데이터에 추가됩니다.")) {
       try {
-        await createSampleData();
+        console.log('샘플 데이터 생성 시작...')
+        // 현재 사용자 ID를 직접 전달
+        await createSampleData(currentUser?.id);
+        console.log('샘플 데이터 생성 완료, 데이터 새로고침 중...')
+        
         // 데이터 새로고침
         const [productsData, salesData, purchasesData] = await Promise.all([
           getProducts(),
@@ -222,10 +238,12 @@ const MainApp: React.FC = () => {
         setSales(salesData);
         setPurchases(purchasesData);
         
+        console.log('데이터 새로고침 완료')
         alert("✅ 샘플 데이터가 성공적으로 생성되었습니다!\n\n대시보드에서 확인해보세요.");
       } catch (error) {
         console.error('샘플 데이터 생성 실패:', error);
-        alert('샘플 데이터 생성에 실패했습니다: ' + error.message);
+        const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다'
+        alert(`❌ 샘플 데이터 생성에 실패했습니다:\n${errorMessage}\n\n브라우저 콘솔을 확인해주세요.`);
       }
     }
   };
